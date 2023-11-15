@@ -1,15 +1,9 @@
-from collections import OrderedDict
-import h5py
-import logging
+
 import numpy as np
-import os
 import pandas as pd
 import pickle
-import torch
-from torch.utils import data
-from torch.utils.data import SubsetRandomSampler
-from typing import List, Optional, Union
 from typeguard import typechecked
+from sklearn.model_selection import train_test_split
 
 __all__ = [
     'split_trials','load_marker_csv', 'load_feature_csv', 'load_marker_h5', 'load_label_csv', 'load_label_pkl',
@@ -252,3 +246,117 @@ def split_trials(
         batch_idxs[dtype] = np.concatenate(batch_idxs[dtype], axis=0)
 
     return batch_idxs
+
+
+def split_list_seq_classes(y_batches, train_size=0.8, val_size=0.1):
+    """
+    Splits y_batches into 3 lists of sequences for training, validation, and testing
+    so that each set has equivalent diversity.
+    :param y_batches: list of arrays
+        each array has the list of a sequence
+    :param train_size: float
+    :param val_size:  float
+    :return:
+    """
+    # Flatten the list to count class occurrences
+    classes, _, _ = classify_sequences_by_binning(y_batches)
+    y_batches = [list(batch) for batch in y_batches]
+
+    # Create an array of indices
+    sequence_indices = np.arange(len(y_batches))
+
+    # Split indices for train+val and test sets using stratified splitting
+    tmp_size = 1 -(train_size + val_size)
+    if (tmp_size)*len(y_batches) < 3: classes[classes == 2] = 1
+
+    train_val_indices, test_indices = train_test_split(sequence_indices, test_size=tmp_size, stratify=classes)
+
+    # Further split train+val indices into train and validation sets
+    temp_stratify_labels = [classes[i] for i in train_val_indices]
+    tmp_size = train_size / (val_size + train_size)
+    train_indices, val_indices = train_test_split(
+        train_val_indices, train_size=tmp_size,
+        stratify=temp_stratify_labels)
+
+    train_indices = np.sort(train_indices).tolist()
+    val_indices = np.sort(val_indices).tolist()
+    test_indices = np.sort(test_indices).tolist()
+    return train_indices, val_indices, test_indices
+
+
+def calculate_entropy(probabilities):
+    """
+    Calculate the entropy of a distribution.
+
+    Parameters:
+    - probabilities: List or numpy array of probabilities.
+
+    Returns:
+    - entropy: Entropy of the distribution.
+    """
+    probabilities = np.array(probabilities)
+    #probabilities = probabilities[probabilities > 0]  # Remove zero probabilities to avoid log(0)
+    entropy = -np.sum(probabilities * np.log2(probabilities))
+    return entropy
+
+
+def gini_index(probabilities):
+    """
+    Calculate the Gini Index of a distribution.
+
+    Parameters:
+    - probabilities: List or numpy array of probabilities.
+
+    Returns:
+    - gini: Gini Index of the distribution.
+    """
+    probabilities = np.array(probabilities)
+    gini = 1 - np.sum(probabilities ** 2)
+    return gini
+
+
+def classify_sequences_by_binning(y_batches, method='gini', min_elements_per_bin=3):
+    """
+    Classify sequences based on their entropy using binning.
+
+    Parameters:
+    - y_batches: List of numpy arrays, each representing a sequence.
+    - method: Method to calculate diversity. Either 'gini' or 'entropy'.
+    - min_elements_per_bin: Minimum number of elements per bin.
+
+    Returns:
+    - classes: List of class labels for each sequence based on entropy.
+    """
+    if method == 'gini':
+        fn_probs = gini_index
+    else:
+        fn_probs = calculate_entropy
+
+    num_classes = np.unique(y_batches).shape[0]
+    entropies = []
+    for batch in y_batches:
+        values, counts = np.unique(batch, return_counts=True)
+        probabilities = np.zeros(num_classes)
+        probabilities[values.astype(int)] = counts / counts.sum()
+        # entropy is -inf when a class is missing from batch so we gini is used by default
+        entropy = fn_probs(probabilities)
+        entropies.append(entropy)
+
+    entropies = np.array(entropies)
+    sorted_indices = np.argsort(entropies)
+    sorted_entropies = entropies[sorted_indices]
+
+    total_elements = len(entropies)
+    num_bins = 3
+    bin_size = max(min_elements_per_bin, total_elements // num_bins)
+
+    # Ensure that each bin has at least min_elements_per_bin elements
+    bins = [bin_size, 2 * bin_size, total_elements]
+
+    classes = np.zeros(total_elements, dtype=int)
+    classes[sorted_indices[:bins[0]]] = 0  # head
+    classes[sorted_indices[bins[0]:bins[1]]] = 1  # body
+    classes[sorted_indices[bins[1]:]] = 2  # tail
+    return classes, entropies, bins
+
+

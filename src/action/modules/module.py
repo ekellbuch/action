@@ -44,6 +44,7 @@ class ClassifierModule(BaseClassifierModule):
                                           average=None)
     self.model = all_classifiers[self.hparams.classifier](self.hparams.classifier_cfg)
     self.cls_idxs = range(self.hparams.classifier_cfg.num_classes)
+    self.test_stage_name = "epoch/test_"
 
     #self.precision = Precision(task="multiclass",
     #                           num_classes=self.hparams.classifier_cfg.num_classes,
@@ -85,7 +86,7 @@ class ClassifierModule(BaseClassifierModule):
       raise ValueError("Loss is NaN")
 
     for output in outputs:
-      self.log(f"batch/{output}", outputs[output])
+      self.log(f"batch/train_{output}", outputs[output])
     return loss
 
   def validation_step(self, batch, batch_idx):
@@ -98,8 +99,14 @@ class ClassifierModule(BaseClassifierModule):
     #self._calc_agg_metrics(stage="epoch/train_")
     self._reset_agg_metrics()
 
+  def on_validation_epoch_start(self):
+    self._reset_agg_metrics()
+
+  def on_test_epoch_start(self):
+    self._reset_agg_metrics()
+
   def on_test_epoch_end(self):
-    self._calc_agg_metrics(stage="epoch/test_")
+    self._calc_agg_metrics(stage=self.test_stage_name)
 
   def on_validation_epoch_end(self):
     self._calc_agg_metrics(stage="epoch/val_")

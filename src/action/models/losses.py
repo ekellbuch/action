@@ -11,7 +11,12 @@ class BalancedSoftmax(_Loss):
 
     def __init__(self, sample_per_class, **kwargs):
         super(BalancedSoftmax, self).__init__()
-        self.sample_per_class = sample_per_class
+        class_freq = sample_per_class
+        classes_included = torch.arange(len(sample_per_class))
+        if 'ignore_index' in kwargs:
+            classes_included = classes_included[classes_included != kwargs['ignore_index']]
+            class_freq = class_freq/class_freq[classes_included].sum()
+        self.sample_per_class = class_freq
         self.kwargs = kwargs
 
     def forward(self, input, label):

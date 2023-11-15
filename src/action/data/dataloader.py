@@ -42,7 +42,10 @@ def preproces_dataset(hparams, model_params):
       logging.info(msg)
       raise FileNotFoundError(msg)
     signals_curr.append('markers')
-    transforms_curr.append(ZScore())
+    if hparams.get("normalize_markers", True):
+      transforms_curr.append(ZScore())
+    else:
+      transforms_curr.append(None)
     paths_curr.append(markers_file)
 
     # hand labels
@@ -80,22 +83,22 @@ def preproces_dataset(hparams, model_params):
     paths.append(paths_curr)
 
   # compute padding needed to account for convolutions
-  # TODO: fix in run
-  #hparams['sequence_pad'] = hparams#compute_sequence_pad(hparams)
+  sequence_pad = model_params['sequence_pad']
 
   ids_list = hparams['expt_ids']
   sequence_length = hparams['sequence_length']
   signals_list = signals
   transforms_list = transforms
   paths_list = paths
-  sequence_pad = model_params['sequence_pad']
 
+  as_numpy = hparams.get("as_numpy", False)
   datasets = []
   for id, signals, transforms, paths in zip(
     ids_list, signals_list, transforms_list, paths_list):
     datasets.append(SingleDataset(
       id=id, signals=signals, transforms=transforms, paths=paths,
       sequence_length=sequence_length,
+      as_numpy=as_numpy,
       sequence_pad=sequence_pad, input_type=input_type))
 
   return datasets
@@ -106,7 +109,7 @@ def compute_sequences(
         data: Union[np.ndarray, list],
         sequence_length: int,
         sequence_pad: int = 0
-) -> list:
+):
     """Compute sequences of temporally contiguous data points.
 
     Partial sequences are not constructed; for example, if the number of time points is 24, and the
@@ -138,7 +141,9 @@ def compute_sequences(
     else:
         batch_dims = (sequence_length + 2 * sequence_pad,)
 
+    # TODO: replace with nan
     n_batches = int(np.floor(data.shape[0] / sequence_length))
+    batch_indices = [np.zeros(sequence_length + 2 * sequence_pad) for _ in range(n_batches)]
     batched_data = [np.zeros(batch_dims) for _ in range(n_batches)]
     for b in range(n_batches):
         idx_beg = b * sequence_length
@@ -147,14 +152,19 @@ def compute_sequences(
             if idx_beg == 0:
                 # initial vals are zeros; rest are real data
                 batched_data[b][sequence_pad:] = data[idx_beg:idx_end + sequence_pad]
+                batch_indices[b][sequence_pad:] = np.arange(idx_beg, idx_end+sequence_pad)
             elif (idx_end + sequence_pad) > data.shape[0]:
                 batched_data[b][:-sequence_pad] = data[idx_beg - sequence_pad:idx_end]
+                batch_indices[b][:-sequence_pad] = np.arange(idx_beg - sequence_pad, idx_end)
             else:
                 batched_data[b] = data[idx_beg - sequence_pad:idx_end + sequence_pad]
+                batch_indices[b] = np.arange(idx_beg - sequence_pad, idx_end + sequence_pad)
+
         else:
             batched_data[b] = data[idx_beg:idx_end]
+            batch_indices[b] = np.arange(idx_beg, idx_end)
 
-    return batched_data
+    return batched_data, batch_indices
 
 
 @typechecked
@@ -173,7 +183,7 @@ def compute_sequence_pad(hparams: dict) -> int:
 
     """
 
-    if hparams['model_class'] == 'random-forest' or hparams['model_class'] == 'xgboost':
+    if hparams['model_class'] in ('random-forest', 'xgboost'):
         pad = 0
     else:
         if hparams['backbone'].lower() == 'temporal-mlp':
@@ -187,6 +197,8 @@ def compute_sequence_pad(hparams: dict) -> int:
         elif hparams['backbone'].lower() in ['lstm', 'gru']:
             # give some warmup timesteps
             pad = 4
+        elif hparams['backbone'].lower() in ['animalst']:
+            pad = 0
         elif hparams['backbone'].lower() == 'tgm':
             raise NotImplementedError
         else:
@@ -208,7 +220,8 @@ class SingleDataset(data.Dataset):
             as_numpy: bool = False,
             sequence_length: int = 500,
             sequence_pad: int = 0,
-            input_type: str = 'markers'
+            input_type: str = 'markers',
+            ignore_index: int = 0,
     ) -> None:
         """
 
@@ -238,6 +251,8 @@ class SingleDataset(data.Dataset):
         # specify data
         self.id = id
 
+        #
+        self.ignore_index = ignore_index
         # get data paths
         self.signals = signals
         self.transforms = {}#OrderedDict()
@@ -257,8 +272,8 @@ class SingleDataset(data.Dataset):
         self.n_sequences = len(self.data[signals[0]])
 
         # meta data about train/test/xv splits; set by DataGenerator
-        self.batch_idxs = None
-        self.n_batches = None
+        # self.batch_idxs = None
+        # self.n_batches = None
 
 
     @typechecked
@@ -301,12 +316,17 @@ class SingleDataset(data.Dataset):
             # from numpy to tensor
             if not self.as_numpy:
                 if self.dtypes[signal] == 'float32':
-                    sample[signal] =torch.from_numpy(sample[signal][0]).to(torch.float32)
+                    sample[signal] = torch.from_numpy(sample[signal][0]).to(torch.float32)
                 else:
                     sample[signal] = torch.from_numpy(sample[signal][0]).to(torch.long)
 
         # add batch index
         sample['batch_idx'] = idx
+        # TODO: remove add sequence index (added for debugging video synchronization)
+        if not self.as_numpy:
+          sample['sequence_idx'] = torch.tensor(self.batch_idxs[idx]).to(torch.long)
+        else:
+          sample['sequence_idx'] = [self.batch_idxs[idx]]
         return sample
 
     @typechecked
@@ -401,7 +421,8 @@ class SingleDataset(data.Dataset):
                         signal, allowed_signals))
 
             # apply transforms to ALL data
-            # TODO: fix split train, val, test
+            # TODO: fix normalization: should be applied to train/val/test separately.
+            # leaving as is to reproduce paper results
             if self.transforms[signal]:
                 data_curr = self.transforms[signal](data_curr)
 
@@ -409,7 +430,13 @@ class SingleDataset(data.Dataset):
             data_curr = data_curr.astype(np.float32)
 
             # compute batches of temporally contiguous data points
-            data_curr = compute_sequences(data_curr, sequence_length, self.sequence_pad)
+            data_curr, idx_curr = compute_sequences(data_curr, sequence_length, self.sequence_pad)
+
+            # add index data and data filename
+            self.batch_idxs = idx_curr
+            self.n_batches = len(idx_curr)
+            if self.ignore_index is not None:
+              pass
 
             self.data[signal] = data_curr
 

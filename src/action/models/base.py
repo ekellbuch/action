@@ -160,6 +160,7 @@ class Segmenter(BaseModel):
         - lambda_weak (float): hyperparam on weak label classification
         - lambda_strong (float): hyperparam on srong label classification
         - lambda_pred (float): hyperparam on next step prediction
+        - lambda_recon (float): hyperparam on reconstruction
         - lambda_task (float): hyperparam on task regression
 
     """
@@ -184,7 +185,7 @@ class Segmenter(BaseModel):
     elif classifier_type == 'binary':
       # single class
       ignore_index = -100  # pytorch default
-    elif classmethod == 'multibinary':
+    elif classifier_type == 'multibinary':
       # multiple non-mutually exclusive classes (each a binary classification)
       raise NotImplementedError
     else:
@@ -256,6 +257,8 @@ class Segmenter(BaseModel):
       from action.models.tcn import DilatedTCN as Module
     elif self.hparams['backbone'].lower() in ['lstm', 'gru']:
       from action.models.rnn import RNN as Module
+    elif self.hparams['backbone'].lower() in ['animalst']:
+      from action.models.min_gpt import AnimalSTWoPosEmb as Module
     elif self.hparams['backbone'].lower() == 'tgm':
       raise NotImplementedError
       # from action.models.tgm import TGM as Module

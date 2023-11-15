@@ -12,7 +12,7 @@ data_cfg:
   data_dir: ${oc.env:LOCAL_PROJECTS_DIR}/segment/action/data/ibl
   expt_ids:
     - cortexlab_KS020_2020-02-06-001
-  #  - wittenlab_ibl_witten_26_2021-01-27-002
+    - wittenlab_ibl_witten_26_2021-01-27-002
   input_type: "markers"
   input_size: 3  # TODO: update for other losses
   sequence_length: 7

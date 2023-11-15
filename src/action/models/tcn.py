@@ -205,3 +205,32 @@ class DilationBlock(nn.Module):
         out = self.block(x)
         res = x if self.downsample is None else self.downsample(x)
         return self.final_activation(out + res)
+
+
+if __name__ == "__main__":
+    opt = {
+        "n_hid_layers": 2,
+        'n_hid_units': 5,  # hidden units per hidden layer
+        'n_lags': 4,  # half-width of temporal convolution window
+        'activation': 'lrelu',  # layer nonlinearity
+        "bidirectional": True,
+        "dropout": 0.1,
+        "input_size": 10,
+    }
+
+    # toy dataset
+    model = DilatedTCN(opt)
+
+    # toy data:
+    data = {"batch_size": 32,
+            "sequence_length":20,
+            "input_size": 10,
+            }
+
+    (b, t, d) = (data["batch_size"], data['sequence_length'],
+                 data['input_size'])
+
+    data = torch.randn((b, t, d))
+    outputs = model(data)
+
+    assert outputs.shape == (b, t, 5)

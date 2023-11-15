@@ -1,7 +1,6 @@
 """
 Train a classifier on top of the features
 """
-#import tensorflow as tf
 import hydra
 from omegaconf import OmegaConf, open_dict
 import os
@@ -12,7 +11,6 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger, TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
-from pytorch_lightning.utilities import rank_zero_only
 import wandb
 
 import datetime
@@ -25,6 +23,7 @@ from action.modules import all_modules
 from action.callbacks import GradNormCallbackSplit
 from action.data.dataloader import compute_sequence_pad
 
+import torch
 script_dir = os.path.abspath(os.path.dirname(__file__))
 
 @hydra.main(config_path="script_configs", config_name="ibl_paw", version_base=None)
@@ -127,7 +126,7 @@ def train(args):
     args.data_cfg.num_workers = int(args.data_cfg.num_workers / num_gpus)
 
   # Module parameters needed to load data
-  if 'sequence_pad' not in args.module_cfg:
+  if args.module_cfg.get("sequence_pad", None) is None:
     sequence_pad = compute_sequence_pad(dict(args.module_cfg.classifier_cfg))
   else:
     sequence_pad = args.module_cfg.sequence_pad
@@ -136,12 +135,12 @@ def train(args):
     "lambda_weak": args.module_cfg.lambda_weak,
     "lambda_strong": args.module_cfg.lambda_strong,
     "lambda_pred": args.module_cfg.lambda_pred,
+    "lambda_recon": args.module_cfg.lambda_recon,
   }
   # ------------------------------------------------
-  # Load data loader
+  # Load data loaders
   ind_data = all_datasets[args.data_cfg.test_set](args.data_cfg, **extra_kwargs)
   ind_data.setup()
-  #import pdb; pdb.set_trace()
   # ------------------------------------------------
   # Load module
   module_args = args.module_cfg
@@ -149,11 +148,16 @@ def train(args):
 
   with open_dict(module_args):
     # inherit from module
-    module_args.samples_per_class = ind_data.train_dataset.samples_per_class.numpy().tolist()
+    if hasattr(ind_data.train_dataset, "samples_per_class"):
+      module_args.samples_per_class = ind_data.train_dataset.samples_per_class.numpy().tolist()
+    if hasattr(ind_data.train_dataset, "weak_samples_per_class"):
+      module_args.weak_samples_per_class = ind_data.train_dataset.weak_samples_per_class.numpy().tolist()
     module_args.sequence_pad = sequence_pad
+    module_args.input_type = args.data_cfg.input_type
     module_args.classifier_cfg.lambda_weak = args.module_cfg.lambda_weak
     module_args.classifier_cfg.lambda_strong = args.module_cfg.lambda_strong
     module_args.classifier_cfg.lambda_pred = args.module_cfg.lambda_pred
+    module_args.classifier_cfg.lambda_recon = args.module_cfg.lambda_recon
     module_args.classifier_cfg.num_classes = args.data_cfg.num_classes
     module_args.classifier_cfg.input_size = args.data_cfg.input_size
 
@@ -163,7 +167,17 @@ def train(args):
   # ------------------------------------------------
   # Load checkpoint
   if args.eval_cfg.ckpt_path is not None:
-    model.model.load_parameters_from_file(args.eval_cfg.ckpt_path)
+    try:
+      model.model.load_parameters_from_file(args.eval_cfg.ckpt_path)
+    except:
+      model.load_state_dict(torch.load(args.eval_cfg.ckpt_path)['state_dict'])
+
+  # add output logit dir to args
+  if args.trainer_cfg.logger == "wandb" and not(args.trainer_cfg.fast_dev_run):
+    try:
+      logger.experiment.summary['out/checkpoint_dir'] = checkpoint.dirpath
+    except:
+      pass
 
   # Train
   if not(args.eval_cfg.eval_only):
@@ -176,8 +190,20 @@ def train(args):
   # Test
   trainer.test(model, dataloaders=ind_data.test_dataloader())
 
+  # ------------------------------------------------
+  # Evaluate in OOD data as well
+  # Load OOD loader
+  ood_data_cfg = args.data_cfg
+  if ood_data_cfg.get('ood_expt_ids', None):
+    ood_data_cfg.expt_ids = ood_data_cfg.ood_expt_ids
+    ood_data_cfg.train_split = 0
+    ood_data_cfg.val_split = 0
+    ood_data = all_datasets[args.data_cfg.test_set](ood_data_cfg, **extra_kwargs)
+    ood_data.setup()
+    # Test in ood data:
+    model.test_stage_name = "epoch/test_ood_"
+    trainer.test(model, dataloaders=ood_data.test_dataloader())
 
-  trainer.test(model, dataloaders=ind_data.full_dataloader())
 
   if args.trainer_cfg.logger == "wandb":
     wandb.finish()
