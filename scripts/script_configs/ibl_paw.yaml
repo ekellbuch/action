@@ -16,15 +16,16 @@ data_cfg:
   input_type: "markers"
   input_size: 3  # TODO: update for other losses
   sequence_length: 7
-  lambda_strong: 1
-  lambda_weak: 1
   num_classes: 5
   batch_size: 32
   num_workers: 32
-  class_idx: null
   seed: null
-  encodings: null
-  samples_per_class: null
+  #class_idx: null
+  #encodings: null
+  #samples_per_class: null # inherit from dataloader
+#  sequence_pad: null # inherit from
+#  model_class: multiclass
+#  backbone : "dtcn"
 
 
 trainer_cfg:
@@ -59,16 +60,18 @@ early_stop_cfg:
 
 module_cfg:
   module: "cls_seq"
-  samples_per_class: null  # inherit from train_dataloader
-  class_idx: null # only if specific model
-  classifier: "baseline"
-  classifier_cfg:
-    model_tier : "small"
-    num_classes: null  # inherit from train_dataloader
-    input_size: null  # inherit from train_dataloader
+  lambda_strong: 1
+  lambda_weak: 0
+  lambda_pred: 0
   optimizer_cfg:
     lr: 0.001
-
+  classifier: "baseline"
+  classifier_cfg:
+    model_class: "multiclass"
+    model_tier : "small"
+    #num_classes: null  # inherit from train_dataloader
+    #input_size: null  # inherit from train_dataloader
+    #samples_per_class: null  # inherit from train_dataloader
 
 
 seed: 0

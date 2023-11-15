@@ -3,7 +3,7 @@ import torch
 from ml_collections import config_dict
 
 from torchmetrics import AveragePrecision
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, Precision, Recall
 from torchmetrics import F1Score as F1
 
 import action
@@ -34,6 +34,7 @@ class ClassifierModule(BaseClassifierModule):
   Train a model on a classifier
   data is batch has sequences batch x input_size
   """
+
   def __init__(self, hparams):
     super().__init__(hparams)
     self.criterion = torch.nn.CrossEntropyLoss()
@@ -41,23 +42,35 @@ class ClassifierModule(BaseClassifierModule):
     self.avg_precision = AveragePrecision(task='multiclass',
                                           num_classes=self.hparams.classifier_cfg.num_classes,
                                           average=None)
-    self.model = all_classifiers[self.hparams.classifier](**self.hparams.classifier_cfg)
+    self.model = all_classifiers[self.hparams.classifier](self.hparams.classifier_cfg)
     self.cls_idxs = range(self.hparams.classifier_cfg.num_classes)
 
+    #self.precision = Precision(task="multiclass",
+    #                           num_classes=self.hparams.classifier_cfg.num_classes,
+    #                           average=None)
+
+    #self.recall = Recall(task="multiclass",
+    #                           num_classes=self.hparams.classifier_cfg.num_classes,
+    #                           average=None)
   def forward(self, batch):
     inputs, target = batch
     output = self.model(inputs)
     loss = self.criterion(output, target)
     accuracy = self.accuracy(output, target)
     ap = self.avg_precision(output, target)
-
+    #precision = self.precision(output, target)
+    #recall = self.recall(output, target)
     outputs = {}
     for m_idx in self.cls_idxs:
-      outputs[f'ap/class_{m_idx}'] = ap[m_idx]
+      outputs[f'avg_precision/class_{m_idx}'] = ap[m_idx]
+      #outputs[f'precision/class_{m_idx}'] = precision[m_idx]
+      #outputs[f'recall/class_{m_idx}'] = recall[m_idx]
 
     outputs['loss'] = loss
     outputs['accuracy'] = accuracy
-    outputs['precision'] = sum(ap)/len(ap)
+    outputs['avg_precision'] = sum(ap[self.cls_idxs])/len(ap[self.cls_idxs])
+    #outputs['precision'] = sum(precision)/len(precision)
+    #outputs['recall'] = sum(recall)/len(recall)
     return outputs
 
   def predict_step(self, batch, batch_idx):
@@ -98,10 +111,18 @@ class ClassifierModule(BaseClassifierModule):
   def _calc_agg_metrics(self, stage):
     self.log(f"{stage}accuracy", self.accuracy.compute())
     aps_ = self.avg_precision.compute()
+    #ps_ = self.precision.compute()
+    #rec_ = self.recall.compute()
     for m_idx in self.cls_idxs:
-      self.log(f"{stage}precision/class_{m_idx}", aps_[m_idx])
-    aps_ = sum(aps_)/ len(aps_)
-    self.log(f"{stage}precision", aps_)
+      self.log(f"{stage}avg_precision/class_{m_idx}", aps_[m_idx])
+      #self.log(f"{stage}precision/class_{m_idx}", ps_[m_idx])
+      #self.log(f"{stage}recall/class_{m_idx}", rec_[m_idx])
+    aps_ = sum(aps_[self.cls_idxs])/ len(aps_[self.cls_idxs])
+    #ps_ = sum(ps_)/ len(ps_)
+    #rec_ = sum(rec_)/ len(rec_)
+    self.log(f"{stage}avg_precision", aps_)
+    #self.log(f"{stage}precision", ps_)
+    #self.log(f"{stage}recall", rec_)
 
     self._reset_agg_metrics()
 
@@ -131,14 +152,20 @@ class ClassifierSeqModule(ClassifierModule):
     predictions = softmax(output)
     accuracy = self.accuracy(predictions, target)
     ap = self.avg_precision(predictions, target)
+    #precision = self.precision(predictions, target)
+    #recall = self.recall(predictions, target)
 
     outputs = {}
     for m_idx in self.cls_idxs:
-      outputs[f'ap/class_{m_idx}'] = ap[m_idx]
+      outputs[f'average_precision/class_{m_idx}'] = ap[m_idx]
+      #outputs[f'precision/class_{m_idx}'] = precision[m_idx]
+      #outputs[f'recall/class_{m_idx}'] = recall[m_idx]
 
     outputs['loss'] = loss
     outputs['accuracy'] = accuracy
-    outputs['precision'] = sum(ap)/len(ap)
+    outputs['average_precision'] = sum(ap[self.cls_idxs])/len(ap[self.cls_idxs])
+    #outputs['precision'] = sum(precision)/len(precision)
+    #outputs['recall'] = sum(recall)/len(recall)
     return outputs
 
 class ClassifierSeqModuleBS(ClassifierSeqModule):
@@ -150,11 +177,10 @@ class ClassifierSeqModuleBS(ClassifierSeqModule):
     self.criterion = BalancedSoftmax(torch.tensor([self.hparams.samples_per_class]).squeeze())
 
 
-all_modules = {
+base_modules = {
   "cls": ClassifierModule,  # multi-class classifier module
   "cls_seq": ClassifierSeqModule,  # multi-class classifier module applied to sequential data
   "cls_seq_bsoftmax": ClassifierSeqModuleBS, # multi-class classifier module applied to sequential data using balanced softmax loss
-
 }
 
 
@@ -171,7 +197,7 @@ if __name__ == "__main__":
 
   # Load  a simple model
   module_args = {"hparams": cfg}
-  model = all_modules[cfg.module](**module_args)
+  model = base_modules[cfg.module](**module_args)
 
   # Make a dummy dataset
   dataset = torch.utils.data.TensorDataset(torch.randn(10, 10), torch.randint(0, 3, (10,)))
@@ -183,7 +209,7 @@ if __name__ == "__main__":
   # Now onto the more complicated dataset:
   data_cfg = config_dict.ConfigDict()
 
-  data_cfg.data_dir = "/Users/ekellbuch/Projects/segment/action/data/ibl"
+  data_cfg.data_dir = "/data/ibl"
   data_cfg.batch_size = 32
   data_cfg.num_workers = 8
   data_cfg.input_type = "markers"
@@ -195,7 +221,7 @@ if __name__ == "__main__":
   # pad before and pad after
 
   import sys
-  import pdb; pdb.set_trace()
+  import os
   ACTION_DIR = action.__path__[0]
 
   CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))

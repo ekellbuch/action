@@ -10,7 +10,7 @@ import torch
 from pathlib import Path
 from omegaconf import OmegaConf
 import os
-from action.models.module import all_modules
+from action.modules import all_modules
 from action.data.datamodule import all_datasets
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -70,7 +70,14 @@ class ModuleTestStruct(parameterized.TestCase):
     cfg.lambda_weak = 1
     cfg.test_set = "base"
 
-    ind_data = all_datasets[cfg.test_set](cfg)
+    extra_kwargs = {
+      "sequence_pad": 1,
+      "lambda_weak" : 0.5,
+      "lambda_strong": 1,
+      "lambda_pred": 0.5,
+    }
+    # Load  a simple model
+    ind_data = all_datasets[cfg.test_set](cfg, **extra_kwargs)
     ind_data.setup()
     train_dataloader = ind_data.train_dataloader()
     batch = next(iter(train_dataloader))

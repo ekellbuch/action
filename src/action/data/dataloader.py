@@ -14,21 +14,18 @@ from typeguard import typechecked
 from action.data.data_utils import load_marker_csv, load_feature_csv, load_marker_h5, load_label_csv, load_label_pkl
 from action.data.data_transforms import ZScore
 __all__ = [
-    'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'preprocess_dataset',
+    'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'preproces_dataset',
 ]
 
 
-
-def preproces_dataset(hparams):
+def preproces_dataset(hparams, model_params):
   """Helper function to build a data generator from hparam dict."""
-  # https://github.com/themattinthehatt/daart/blob/master/daart/utils.py
-  # get data paths
+  # Edited from https://github.com/themattinthehatt/daart/blob/master/daart/utils.py
   signals = []
   transforms = []
   paths = []
 
   for expt_id in hparams['expt_ids']:
-
     signals_curr = []
     transforms_curr = []
     paths_curr = []
@@ -49,7 +46,7 @@ def preproces_dataset(hparams):
     paths_curr.append(markers_file)
 
     # hand labels
-    if hparams.get('lambda_strong', 0) > 0:
+    if model_params.get('lambda_strong', 0) > 0:
       if expt_id not in hparams.get('expt_ids_to_keep', hparams['expt_ids']):
         hand_labels_file = None
       else:
@@ -63,7 +60,7 @@ def preproces_dataset(hparams):
       paths_curr.append(hand_labels_file)
 
     # heuristic labels
-    if hparams.get('lambda_weak', 0) > 0:
+    if model_params.get('lambda_weak', 0) > 0:
       heur_labels_file = os.path.join(
         hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.csv')
       signals_curr.append('labels_weak')
@@ -71,7 +68,7 @@ def preproces_dataset(hparams):
       paths_curr.append(heur_labels_file)
 
     # tasks
-    if hparams.get('lambda_task', 0) > 0:
+    if model_params.get('lambda_task', 0) > 0:
       tasks_labels_file = os.path.join(hparams['data_dir'], 'tasks', expt_id + '.csv')
       signals_curr.append('tasks')
       transforms_curr.append(ZScore())
@@ -83,15 +80,15 @@ def preproces_dataset(hparams):
     paths.append(paths_curr)
 
   # compute padding needed to account for convolutions
-  # TODO: fix in rand
-  hparams['sequence_pad'] = 1  # compute_sequence_pad(hparams)
+  # TODO: fix in run
+  #hparams['sequence_pad'] = hparams#compute_sequence_pad(hparams)
 
   ids_list = hparams['expt_ids']
   sequence_length = hparams['sequence_length']
   signals_list = signals
   transforms_list = transforms
   paths_list = paths
-  sequence_pad = hparams['sequence_pad']
+  sequence_pad = model_params['sequence_pad']
 
   datasets = []
   for id, signals, transforms, paths in zip(

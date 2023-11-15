@@ -21,8 +21,9 @@ import sys
 ACTION_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, ACTION_DIR + "/src")
 from action.data.datamodule import all_datasets
-from action.models.module import all_modules
+from action.modules import all_modules
 from action.callbacks import GradNormCallbackSplit
+from action.data.dataloader import compute_sequence_pad
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 
@@ -125,28 +126,45 @@ def train(args):
     args.data_cfg.batch_size = int(args.data_cfg.batch_size / num_gpus)
     args.data_cfg.num_workers = int(args.data_cfg.num_workers / num_gpus)
 
+  # Module parameters needed to load data
+  if 'sequence_pad' not in args.module_cfg:
+    sequence_pad = compute_sequence_pad(dict(args.module_cfg.classifier_cfg))
+  else:
+    sequence_pad = args.module_cfg.sequence_pad
+  extra_kwargs = {
+    "sequence_pad": sequence_pad,
+    "lambda_weak": args.module_cfg.lambda_weak,
+    "lambda_strong": args.module_cfg.lambda_strong,
+    "lambda_pred": args.module_cfg.lambda_pred,
+  }
   # ------------------------------------------------
-  # Train set
-  ind_data = all_datasets[args.data_cfg.test_set](args.data_cfg)
+  # Load data loader
+  ind_data = all_datasets[args.data_cfg.test_set](args.data_cfg, **extra_kwargs)
   ind_data.setup()
+  #import pdb; pdb.set_trace()
   # ------------------------------------------------
   # Load module
   module_args = args.module_cfg
   OmegaConf.set_struct(module_args, True)
 
   with open_dict(module_args):
+    # inherit from module
+    module_args.samples_per_class = ind_data.train_dataset.samples_per_class.numpy().tolist()
+    module_args.sequence_pad = sequence_pad
+    module_args.classifier_cfg.lambda_weak = args.module_cfg.lambda_weak
+    module_args.classifier_cfg.lambda_strong = args.module_cfg.lambda_strong
+    module_args.classifier_cfg.lambda_pred = args.module_cfg.lambda_pred
     module_args.classifier_cfg.num_classes = args.data_cfg.num_classes
     module_args.classifier_cfg.input_size = args.data_cfg.input_size
-    module_args.samples_per_class = ind_data.train_dataset.samples_per_class.numpy().tolist()
-    module_args.class_idx = args.data_cfg.class_idx
+
 
   module_args = {"hparams": module_args}
   model = all_modules[args.module_cfg.module](**module_args)
   # ------------------------------------------------
   # Load checkpoint
   if args.eval_cfg.ckpt_path is not None:
-    from utils import load_checkpoint_to_model
-    model.model = load_checkpoint_to_model(args.eval_cfg.ckpt_path, model.model)
+    model.model.load_parameters_from_file(args.eval_cfg.ckpt_path)
+
   # Train
   if not(args.eval_cfg.eval_only):
     trainer.fit(model, train_dataloaders=ind_data.train_dataloader(), val_dataloaders=ind_data.val_dataloader())
@@ -157,6 +175,9 @@ def train(args):
 
   # Test
   trainer.test(model, dataloaders=ind_data.test_dataloader())
+
+
+  trainer.test(model, dataloaders=ind_data.full_dataloader())
 
   if args.trainer_cfg.logger == "wandb":
     wandb.finish()

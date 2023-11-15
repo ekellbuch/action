@@ -9,16 +9,17 @@ class BalancedSoftmax(_Loss):
     Balanced Softmax Loss
     """
 
-    def __init__(self, sample_per_class):
+    def __init__(self, sample_per_class, **kwargs):
         super(BalancedSoftmax, self).__init__()
         self.sample_per_class = sample_per_class
+        self.kwargs = kwargs
 
-    def forward(self, input, label, reduction='mean'):
+    def forward(self, input, label):
         return balanced_softmax_loss(label, input, self.sample_per_class,
-                                     reduction)
+                                     **self.kwargs)
 
 
-def balanced_softmax_loss(labels, logits, sample_per_class, reduction):
+def balanced_softmax_loss(labels, logits, sample_per_class, **kwargs):
   """Compute the Balanced Softmax Loss between `logits` and the ground truth `labels`.
   Args:
     labels: A int tensor of size [batch].
@@ -31,5 +32,5 @@ def balanced_softmax_loss(labels, logits, sample_per_class, reduction):
   spc = sample_per_class.type_as(logits)
   spc = spc.unsqueeze(0).expand(logits.shape[0], -1)
   logits = logits + spc.log()
-  loss = F.cross_entropy(input=logits, target=labels, reduction=reduction)
+  loss = F.cross_entropy(input=logits, target=labels, **kwargs)
   return loss

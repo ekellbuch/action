@@ -24,9 +24,10 @@ from action.data.dataloader import preproces_dataset
 
 
 class BaseModule(pl.LightningDataModule):
-  def __init__(self, args):
+  def __init__(self, args, **kwargs):
     super().__init__()
     self.hparams.update(args)
+    self.extra_params = kwargs
     # input type is either pose or features
 
     self.seed = self.hparams.get("seed", None)
@@ -43,13 +44,21 @@ class BaseModule(pl.LightningDataModule):
     print("Preparing data", flush=True)
     start_batch_time = time.time()
     # Dictionary with two keys data and signals
-    self.dataset = preproces_dataset(self.hparams)[0]
+    self.dataset = preproces_dataset(self.hparams, self.extra_params)[0]
+
+    #data_utils.split_trials(1, 0, 9, )
+    train_split = self.hparams.get("train_split", 0.8)
+    val_split = self.hparams.get("val_split", 0.1)
+    #val_tr = self.hparams.get("val_split", 0.1)
+    #test_tr = self.hparams.get("test_split", 0.1)
+    #gap_tr = self.hparams.get("gap_split", 0)
     total_len = len(self.dataset)
-    train_len = int(0.8 * total_len)
-    val_len = int(0.1 * total_len)
+    train_len = int(train_split * total_len)
+    val_len = int(val_split * total_len)
     test_len = total_len - train_len - val_len
 
     # split data into train test and val
+    # TODO: merge split_trials function
     self.train_dataset, \
     self.val_dataset, \
     self.test_dataset = torch.utils.data.random_split(
@@ -97,6 +106,18 @@ class BaseModule(pl.LightningDataModule):
       num_workers=self.hparams.num_workers,
       drop_last=False,
       pin_memory=True,
+    )
+    return dataloader
+
+  def full_dataloader(self):
+    # already shuffled
+    dataloader = DataLoader(
+      self.dataset,
+      batch_size=self.hparams.batch_size,
+      num_workers=self.hparams.num_workers,
+      drop_last=False,
+      pin_memory=True,
+      generator=self.generator_from_seed,
     )
     return dataloader
 

@@ -1,0 +1,84 @@
+Comment: >
+  Run:
+  python run.py --config-name="fly" trainer_cfg.fast_dev_run=1
+  python run.py trainer_cfg.fast_dev_run=1 module_cfg.module=cls_seq_bsoftmax
+
+project_name: "data_fly"
+experiment_name: "run_fly_repro"
+
+data_cfg:
+  test_set: "base"
+  data_dir: ${oc.env:LOCAL_PROJECTS_DIR}/segment/action/data/fly
+  expt_ids:
+    - 2019_06_26_fly2
+  input_type: "markers"
+  input_size: 16  # TODO: update for other losses
+  sequence_length: 500
+  num_classes: 7
+  batch_size: 32
+  num_workers: 32
+  seed: null
+#  sequence_pad: null # inherited from dataloader
+# class_idx: null
+#  encodings: null
+#   samples_per_class: null
+#  model_class: multiclass
+#  backbone : "dtcn"
+#  n_hid_layers: 2      # hidden layers in network
+#  n_lags: 4            # half-width of temporal convolution window
+
+trainer_cfg:
+  fast_dev_run: 0
+  logger: "wandb"
+  deterministic: false
+  log_every_n_steps: 1
+  max_epochs: 500
+  precision: 32
+  accelerator: "auto"
+  val_check_interval: 1.0  # set to 1 for early stopping
+  gradient_clip_val: 0.5
+  gradient_clip_algorithm: "value" #"norm"
+
+eval_cfg:
+  eval_only: 0
+  ckpt_path: null
+  return_model: 0  # debugger to return model
+
+callbacks:
+  gradnorm: 1
+  checkpoint_callback: 0
+  early_stopping: 1
+  lr_monitor: 0   #this one?
+
+early_stop_cfg:
+  monitor: "epoch/val_accuracy"
+  mode: max
+  verbose: true
+  min_delta: 0.0
+  patience: 10  # related to val_check_interval
+
+module_cfg:
+  module: "segmenter_module"
+  lambda_strong: 1  # hyperparam on classifying strong (hand) labels
+  lambda_weak: 0.5  # hyperparam on classifying weak (heuristic) labels
+  lambda_pred: 0.5  # hyperparam on one-step-ahead prediction
+  #samples_per_class: null  # inherit from train_dataloader
+  #sequence_pad: null  # inherit from train_dataldoer
+  optimizer_cfg:
+    lr: 0.0001
+  classifier: "segmenter"
+  classifier_cfg:
+    model_class: "multiclass"
+    backbone : "dtcn"
+    n_hid_layers: 2      # hidden layers in network
+    n_hid_units: 32      # hidden units per hidden layer
+    n_lags: 4            # half-width of temporal convolution window
+    activation: 'lrelu'  # layer nonlinearity
+    #input_size: null       # inherit dimensionality of markers
+    #num_classes: null  # inherit from train_dataloader
+
+seed: 0
+
+hydra:
+  run:
+    dir: ./outputs/${now:%y-%m-%d}/${now:%H-%M-%S}
