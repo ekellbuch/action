@@ -1,6 +1,7 @@
 Comment: >
   Run:
-  python run.py --config-name="fly_mingpt_v2" trainer_cfg.fast_dev_run=1
+  python run.py --config-name="fly_mingpt_v2" trainer_cfg.fast_dev_run=1 data_cfg.num_workers=4
+  python run.py --config-name="fly_mingpt_v2" trainer_cfg.max_epochs=1 data_cfg.num_workers=2
 
 project_name: "fly_mingpt_v2"
 experiment_name: "min_gpt_long"

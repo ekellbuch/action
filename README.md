@@ -2,35 +2,20 @@
 
 # Action recognition toolbox
 
-## Scripts:
-1. Train a simple supervised model:
-```
-python run.py --config-name="fly_daart" eval_cfg.eval_only=0
-```
-2. Reproduce results daart demo:
-```
-python run.py --config-name="fly_daart"
-```
+This repository contains a toolbox to classify time series data.
 
-## Experiments
+Given some time series data (i.e. DLC outputs), this codebase allows you to: 
+- train a model to reconstruct the time series 
+- train a model to segment the time series into classes (i.e. actions)
+  - in a supervised setting, i.e. if there are labels
+  - in a semi-supervised setting, i.e. if there are no ground truth labels but there is some weak signal
+- combine information across multiple time series.
 
-|                                                             Wandb Experiment                                                             |                              parameters                              |                                                                                                                                     comments                                                                                                                                      |
-|:----------------------------------------------------------------------------------------------------------------------------------------:|:--------------------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-|                                   [zv5odluq](https://wandb.ai/ekellbuch/uncategorized/sweeps/zv5odluq)                                   |              train vanilla classifier on top of dataset              | running on lion
-|                                      [35r08dx1](https://wandb.ai/ekellbuch/data_fly/runs/35r08dx1)                                       |                     reproduce fly_daart results                      | we can reproduce them when loading checkpoints
-| [pojyktyr](https://wandb.ai/ekellbuch/uncategorized/sweeps/pojyktyr) |                compare segmenter w/o loss of interest                | no difference for labeled dataset
-| [ub5ahdos](https://wandb.ai/ekellbuch/uncategorized/sweeps/ub5ahdos) |        compare segmenter w weak_bsoftmax, turn off grad_clip         | no difference for labeled dataset
-| [07zg6fd8](https://wandb.ai/ekellbuch/uncategorized/sweeps/07zg6fd8) | compare segmenter w weak_bsoftmax for unlabeled using simba features | worse performance in all classes
-
-
-
-# Code and Data structure:
+## Data and Code structure:
 - data structure:
+
 ```
 data_directory
-├── features-simba
-│   ├── <sess_id_0>.csv
-│   └── <sess_id_1>.csv
 ├── labels-hand
 │   ├── <sess_id_0>.csv
 │   └── <sess_id_1>.csv
@@ -43,13 +28,32 @@ data_directory
 └── videos
     ├── <sess_id_0>.mp4
     └── <sess_id_1>.mp4
-``` 
-- modules:
-  - ClassifierModule: classifier module
-  - ClassifierSeqModule: sequence classifier module
-  - ClassifierSeqModuleBS: sequence classifier module with specific loss
-  - SegmenterModule: segmenter module
+```
+- Experiment configuration: 
+  see scripts/script_configs/fly_daart.py
+```
+data_cfg:  data configuration
+trainer_cfg: trainer configuration
+eval_cfg: evaluation configuration
+module_cfg: module configuration
+  classifier_cfg: architecture configuration
+```
 
+- modules:
+  - ClassifierModule: vanilla classification module.
+  - ClassifierSeqModule: vanilla sequence classification module.
+  - ClassifierSeqModuleBS: example with specific loss added to sequence module.
+  - SegmenterModule: sequence module with reconstruction and classification.
+
+## Scripts:
+1. Train a simple supervised model:
+```
+python run.py --config-name="fly_daart" eval_cfg.eval_only=0
+```
+2. Reproduce results daart demo:
+```
+python run.py --config-name="fly_daart"
+```
 
 # References:
 - [Daart](https://github.com/themattinthehatt/daart)

@@ -116,8 +116,9 @@ class BaseModule(LightningDataModule):
 
   def _calculate_samples_p_class(self, dataset, x, label_key="labels_strong"):
     samples = np.zeros(self.hparams.num_classes)
+    import pdb; pdb.set_trace()
     if len(x) > 0:
-      unique_train, train_samples_per_class = np.unique(np.asarray(dataset.data[label_key])[np.asarray(x)], return_counts=True)
+      unique_train, train_samples_per_class = np.unique(np.asarray(np.asarray(dataset.data[label_key])[np.sort(x)]), return_counts=True)
       samples[unique_train.astype(int)] = train_samples_per_class
     return samples
 
