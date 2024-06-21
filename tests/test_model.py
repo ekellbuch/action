@@ -1,22 +1,10 @@
 """
 Test models
-
 """
 from absl.testing import absltest
 from absl.testing import parameterized
-from ml_collections import config_dict
-import sys
-import yaml
-import torch
-from pathlib import Path
-from omegaconf import OmegaConf
-import os
 from action.models.base import all_classifiers
-BASE_DIR = Path(__file__).resolve().parent.parent
 
-toy_data = {
-  "ibl": str(BASE_DIR / "data/ibl")
-}
 
 def create_network_cfg():
   classifier_cfg = {
@@ -58,6 +46,7 @@ class ModelTestSimple(parameterized.TestCase):
     model = all_classifiers[classifier](hparams)
 
     assert model is not None
+
 
 if __name__ == '__main__':
   absltest.main()
