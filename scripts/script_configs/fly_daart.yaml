@@ -1,5 +1,5 @@
 Comment: >
-  Run:
+  # Debugging instructions:
   python run.py --config-name="fly_daart" trainer_cfg.fast_dev_run=1
   # match performance of example
   python run.py --config-name="fly_daart" eval_cfg.eval_only=1 eval_cfg.ckpt_path="/data/Projects/segment/daart/results/best_val_model.pt"
