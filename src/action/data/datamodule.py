@@ -2,7 +2,7 @@
 Train a classifier on top of the features
 """
 from typing import Optional
-from pytorch_lightning import LightningDataModule
+import pytorch_lightning as pl
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
@@ -27,7 +27,7 @@ class ConcatDataset(torch.utils.data.Dataset):
     return torch.stack([d.samples_per_class for d in self.datasets], axis=0).sum(0)
 
 
-class BaseModule(LightningDataModule):
+class BaseModule(pl.LightningDataModule):
   def __init__(self, args, **kwargs):
     super().__init__()
     self.hparams.update(args)
@@ -116,7 +116,6 @@ class BaseModule(LightningDataModule):
 
   def _calculate_samples_p_class(self, dataset, x, label_key="labels_strong"):
     samples = np.zeros(self.hparams.num_classes)
-    import pdb; pdb.set_trace()
     if len(x) > 0:
       unique_train, train_samples_per_class = np.unique(np.asarray(np.asarray(dataset.data[label_key])[np.sort(x)]), return_counts=True)
       samples[unique_train.astype(int)] = train_samples_per_class

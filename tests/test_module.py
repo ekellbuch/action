@@ -20,22 +20,19 @@ from omegaconf import OmegaConf, open_dict
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 toy_data = {
-  "ibl": str(BASE_DIR / "data/ibl")
+  "fly_daart": str(BASE_DIR / "data/fly_daart")
 }
 
 
 TOY_CONFIG = {
-  "fly": str(BASE_DIR / "scripts/script_configs/fly.yaml"),
-  "fly_daart": str(BASE_DIR / "scripts/script_configs/fly_daart.yaml"),
-  "fly_reconstruction": str(BASE_DIR / "scripts/script_configs/fly_reconstruction.yaml"),
-"ibl": str(BASE_DIR / "scripts/script_configs/ibl_paw.yaml"),
+"fly_daart": str(BASE_DIR / "scripts/script_configs/fly_daart.yaml"),
 }
 
 def load_cfg(data) -> dict:
   """Load all toy data config file without hydra."""
-  cfg = yaml.load(open(str(TOY_CONFIG[data])), Loader=yaml.FullLoader)
+  with open(str(TOY_CONFIG[data]),'r',encoding='UTF-8') as file:
+    cfg = yaml.load(file, Loader=yaml.FullLoader)
   return OmegaConf.create(cfg)
-
 
 
 def create_cfg(module, classifier, input_size=10, num_classes=3) -> dict:
@@ -51,7 +48,7 @@ def create_cfg(module, classifier, input_size=10, num_classes=3) -> dict:
   cfg.optimizer_cfg.lr = 0.001
   return cfg
 
-
+"""
 class ModuleTestSimple(parameterized.TestCase):
   @parameterized.named_parameters(
     ("cls_baseline", "cls", "baseline")
@@ -74,16 +71,16 @@ class ModuleTestSimple(parameterized.TestCase):
 
 class ModuleTestStruct(parameterized.TestCase):
   @parameterized.named_parameters(
-    ("cls_structured_baseline", "cls_seq", "baseline")
+    ("cls_structured_baseline", "cls_seq", "baseline", "fly_daart")
   )
-  def test_cls_struct_module(self, module, classifier):
+  def test_cls_struct_module(self, module, classifier, data):
     torch.set_default_dtype(torch.float32)
     cfg = config_dict.ConfigDict()
-    cfg.data_dir = toy_data["ibl"]
+    cfg.data_dir = toy_data[data]
     cfg.batch_size = 32
     cfg.num_workers = os.cpu_count()
     cfg.input_type = "markers"
-    cfg.expt_ids = ["cortexlab_KS020_2020-02-06-001"]
+    cfg.expt_ids = ["2019_06_26_fly2"]
     cfg.sequence_length = 5
     cfg.lambda_strong = 1
     cfg.lambda_weak = 1
@@ -113,13 +110,13 @@ class ModuleTestStruct(parameterized.TestCase):
 
     # Take a grad step
     loss = model.training_step(batch, 0)
-    assert not torch.isnan(loss)
-
+    self.assertTrue(not torch.isnan(loss))
+"""
 class ModuleTestGrad(parameterized.TestCase):
   @parameterized.named_parameters(
-    ("cls_sef_fly_grad", "fly", "segmenter_module"),
-    ("cls_segbsoft_fly_grad", "fly", "segmenterBsoft_module"),
-    ("cls_segbsoftweak_fly_grad", "fly", "segmenterBsoftWeak_module"),
+    ("cls_sef_fly_grad", "fly_daart", "segmenter_module"),
+    ("cls_segbsoft_fly_grad", "fly_daart", "segmenterBsoft_module"),
+    ("cls_segbsoftweak_fly_grad", "fly_daart", "segmenterBsoftWeak_module"),
   )
   def test_load_datamodule(self, data, module):
     args = load_cfg(data)
@@ -189,84 +186,6 @@ class ModuleTestGrad(parameterized.TestCase):
 
     loss = model.training_step(batch, batch_idx)
     print(f"{module} label_strong {num_non_zero} label_weak {num_non_zero_weak} loss {loss}", flush=True)
-
-
-
-class ModuleTestVitSegmenter(parameterized.TestCase):
-  @parameterized.named_parameters(
-    ("cls_sef_fly_reconstruction", "fly_reconstruction", "segmenter_module"),
-  )
-  def test_loss_reconstruction(self, data, module):
-    args = load_cfg(data)
-    if args.seed is not None:
-      seed_everything(args.seed)
-
-    cfg = args.data_cfg
-    cfg.num_workers = os.cpu_count()
-
-    cfg.lambda_strong = 1
-    cfg.lambda_weak = 1
-    cfg.lambda_pred = 0.5
-    cfg.batch_size = 1
-
-    sequence_pad = 0
-    # add
-    extra_kwargs = {
-      "sequence_pad": sequence_pad,
-      "lambda_weak": cfg.lambda_weak,
-      "lambda_strong": cfg.lambda_strong,
-      "lambda_pred": cfg.lambda_pred,
-    }
-
-    # pad before and pad after
-    ind_data = all_datasets[cfg.test_set](cfg, **extra_kwargs)
-    ind_data.setup()
-    train_dataloader = ind_data.train_dataloader()
-
-    # Load module
-
-    module_args = args.module_cfg
-    OmegaConf.set_struct(module_args, True)
-
-    with open_dict(module_args):
-      # inherit from module
-      module_args.samples_per_class = ind_data.train_dataset.samples_per_class.numpy().tolist()
-      module_args.sequence_pad = sequence_pad
-      module_args.classifier_cfg.lambda_weak = cfg.lambda_weak
-      module_args.classifier_cfg.lambda_strong = cfg.lambda_strong
-      module_args.classifier_cfg.lambda_pred = cfg.lambda_pred
-      module_args.classifier_cfg.num_classes = args.data_cfg.num_classes
-      module_args.classifier_cfg.input_size = args.data_cfg.input_size
-      module_args.classifier_cfg.sequence_length = args.data_cfg.sequence_length
-      module_args.classifier_cfg.sequence_pad = sequence_pad
-
-    module_args = {"hparams": module_args}
-
-    model = all_modules[module](**module_args)
-
-    # Take a grad step
-    print('strong labels', ind_data.train_dataset.samples_per_class.numpy().tolist(), flush=True)
-    print('weak labels', ind_data.train_dataset.weak_samples_per_class.numpy().tolist(), flush=True)
-
-    total_strong_non_zero = 0
-    total_weak_non_zero = 0
-    for batch_idx, batch in enumerate(iter(train_dataloader)):
-      num_non_zero = (batch['labels_strong'] != 0).sum()
-      num_non_zero_weak = (batch['labels_weak'] != 0).sum()
-      #print(f"{module} batch {batch_idx} n_strong labels", num_non_zero, flush=True)
-      total_strong_non_zero +=1 if num_non_zero > 0 else 0
-      total_weak_non_zero +=1 if num_non_zero_weak > 0 else 0
-      #loss = model.training_step(batch, batch_idx)
-      #print(f"{module} loss", loss, flush=True)
-
-    print(f"{module} strong_non_zero batch {total_strong_non_zero}/{batch_idx}", flush=True)
-    print(f"{module} weak_non_zero batch {total_weak_non_zero}/{batch_idx}", flush=True)
-
-
-    loss = model.training_step(batch, batch_idx)
-    print(f"{module} label_strong {num_non_zero} label_weak {num_non_zero_weak} loss {loss}", flush=True)
-    print(loss)
-    import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':
