@@ -1,6 +1,6 @@
 
 
-# Action recognition toolbox
+# Time Series Analysis toolbox
 
 This repository contains a toolbox to classify time series data.
 
@@ -44,6 +44,10 @@ module_cfg: module configuration
   - ClassifierSeqModule: vanilla sequence classification module.
   - ClassifierSeqModuleBS: example with specific loss added to sequence module.
   - SegmenterModule: sequence module with reconstruction and classification.
+
+## Installation instructions:
+
+See [INSTALLATION.md](docs/INSTALLATION.md)
 
 ## Scripts:
 1. Train a simple supervised model:

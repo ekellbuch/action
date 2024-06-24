@@ -41,8 +41,8 @@ trainer_cfg:
   gradient_clip_algorithm: "value" #"norm"
 
 eval_cfg:
-  eval_only: 1   # run evaluation only pipeline
-  ckpt_path: "/data/Projects/segment/daart/results/best_val_model.pt"
+  eval_only: 0   # run evaluation only pipeline
+  ckpt_path: 
   return_model: 0  # debugger to return model
 
 callbacks:
@@ -63,9 +63,11 @@ module_cfg:
   lambda_strong: 1  # hyperparam on classifying strong (hand) labels
   lambda_weak: 0.5  # hyperparam on classifying weak (heuristic) labels
   lambda_pred: 0.5  # hyperparam on one-step-ahead prediction
+  lambda_recon: 0 # hyperparam on seq reconstruction
   sequence_pad: 16  # padding for sequence length
   #samples_per_class: null  # inherit from train_dataloader
   optimizer_cfg:
+    type: "adam"
     lr: 1e-4
     amsgrad: True
   classifier: "segmenter"
