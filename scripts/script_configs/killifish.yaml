@@ -2,8 +2,8 @@ Comment: >
   # Debugging instructions:
   python run.py --config-name="killifish" trainer_cfg.fast_dev_run=1 data_cfg.num_workers=4
 
-project_name: "fly_mingpt_v2"
-experiment_name: "min_gpt_long"
+project_name: "killifish_mingpt_v2"
+experiment_name: "killifish_baseline"
 
 common:
   input_type: &input_type "markers"
