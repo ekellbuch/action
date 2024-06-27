@@ -188,10 +188,13 @@ def train(args):
       return ind_data, model, trainer
 
   # Test
-  trainer.test(model, dataloaders=ind_data.test_dataloader())
+  trainer.test(model, dataloaders=ind_data.test_dataloader(), ckpt_path='best')
 
   # ------------------------------------------------
   # Evaluate in OOD data as well
+  # Free data from memory
+  del ind_data
+
   # Load OOD loader
   ood_data_cfg = args.data_cfg
   if ood_data_cfg.get('ood_expt_ids', None):
@@ -202,7 +205,7 @@ def train(args):
     ood_data.setup()
     # Test in ood data:
     model.test_stage_name = "epoch/test_ood_"
-    trainer.test(model, dataloaders=ood_data.test_dataloader())
+    trainer.test(model, dataloaders=ood_data.test_dataloader(),ckpt_path='best')
 
 
   if args.trainer_cfg.logger == "wandb":
