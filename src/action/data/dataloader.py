@@ -12,7 +12,7 @@ from torch.utils.data import SubsetRandomSampler
 from typing import List, Optional, Union
 from typeguard import typechecked
 from action.data.data_utils import load_marker_csv, load_feature_csv, load_marker_h5, load_label_csv, load_label_pkl
-from action.data.data_transforms import ZScore
+from action.data.data_transforms import ZScore, NormalizeAlongDimension
 __all__ = [
     'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'preproces_dataset',
 ]
@@ -42,6 +42,9 @@ def preproces_dataset(hparams, model_params):
       logging.info(msg)
       raise FileNotFoundError(msg)
     signals_curr.append('markers')
+    if hparams.get("normalize_markers_adim", False):
+      transforms_curr.append(NormalizeAlongDimension())
+    
     if hparams.get("normalize_markers", True):
       transforms_curr.append(ZScore())
     else:

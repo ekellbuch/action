@@ -11,7 +11,6 @@ class Transform(object):
     raise NotImplementedError
 
 
-
 class ZScore(Transform):
     """z-score channel activity."""
 
@@ -40,7 +39,33 @@ class ZScore(Transform):
     def __repr__(self):
         return 'ZScore()'
 
+class NormalizeAlongDimension(Transform):
+    def __init__(self, dim=-1):
+        """
+        Initializes the normalization transform.
 
+        Args:
+        - dim (int): The dimension along which to normalize. Default is -1 (last dimension).
+        """
+        self.dim = dim
+
+    def __call__(self, x):
+        """
+        Applies the normalization to the input tensor.
+
+        Args:
+        - x (torch.Tensor): The input tensor.
+
+        Returns:
+        - torch.Tensor: The normalized tensor.
+        """
+        # Compute the sum along the specified dimension, keep dimensions for broadcasting
+        sum_along_dim = x.sum(self.dim, keepdims=True)
+        
+        # Normalize by dividing the tensor by the sum along the specified dimension
+        normalized_x = x / sum_along_dim
+        
+        return normalized_x
 if __name__ == '__main__':
   # Dummy data
   dummy_data = torch.randn((3, 256, 256))  # Assuming image data
