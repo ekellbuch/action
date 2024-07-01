@@ -2,27 +2,34 @@ from ml_collections import config_dict
 import torch
 from torch import nn
 import numpy as np
-from action.modules.module import ClassifierModule
+from action.modules.module import BaseClassifierModule
 from action.models import losses
+from action.models.base import all_classifiers
 from torchmetrics import Accuracy, R2Score, AveragePrecision, Precision, Recall, F1Score, MeanSquaredError
 
 from omegaconf import OmegaConf
 
-class SegmenterModule(ClassifierModule):
+class SegmenterModule(BaseClassifierModule):
   def __init__(self, hparams):
     super().__init__(hparams)
+
+    self.test_stage_name = "epoch/test_"
 
     self.ignore_index = hparams.get('ignore_class', 0)
     weight = hparams.get('class_weights', None)
     if weight is not None:
       weight = torch.tensor(weight, dtype=torch.float32)
 
+    
     self.lambda_weak = torch.tensor(hparams.get('lambda_weak', 0))
     self.lambda_strong = torch.tensor(hparams.get('lambda_strong', 0))
+    # next step prediction
     self.lambda_pred = torch.tensor(hparams.get('lambda_pred', 0))
     self.lambda_task = torch.tensor(hparams.get('lambda_task', 0))
     self.lambda_recon = torch.tensor(hparams.get('lambda_recon', 0))
     self.kl_weight = torch.tensor(hparams.get('kl_weight', 1))
+
+    self.model = all_classifiers[self.hparams.classifier](self.hparams.classifier_cfg)
 
     if self.lambda_strong > 0:
       self.criterion = torch.nn.CrossEntropyLoss(
@@ -383,6 +390,32 @@ class SegmenterModule(ClassifierModule):
 
       optimizer = torch.optim.AdamW(optim_groups, lr=train_config.lr, betas=train_config.betas)
       return optimizer
+
+  def training_step(self, batch, batch_idx):
+    outputs = self.forward(batch)
+    loss = outputs['loss']
+    if torch.isnan(loss):
+      raise ValueError("Loss is NaN")
+
+    for output in outputs:
+      self.log(f"batch/train_{output}", outputs[output])
+    return loss
+
+  def on_train_epoch_end(self):
+    #self._calc_agg_metrics(stage="epoch/train_")
+    self._reset_agg_metrics()
+
+  def on_validation_epoch_start(self):
+    self._reset_agg_metrics()
+
+  def on_test_epoch_start(self):
+    self._reset_agg_metrics()
+
+  def on_test_epoch_end(self):
+    self._calc_agg_metrics(stage=self.test_stage_name)
+
+  def on_validation_epoch_end(self):
+    self._calc_agg_metrics(stage="epoch/val_")
 
 
 class SegmenterBsoftModule(SegmenterModule):
