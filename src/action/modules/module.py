@@ -16,17 +16,18 @@ class BaseClassifierModule(pl.LightningModule):
     super().__init__()
     self.hparams.update(hparams)
 
-  def forward(self, x):
+  def forward(self, batch):
     raise NotImplementedError
 
-  def training_step(self, x):
+  def training_step(self, batch):
     raise NotImplementedError
 
-  def validation_step(self, x):
-    raise NotImplementedError
+  def validation_step(self, batch, batch_idx):
+      outputs = self.forward(batch)
 
-  def test_step(self, x):
-    raise NotImplementedError
+  def test_step(self, batch):
+      outputs = self.forward(batch)
+
 
 
 class ClassifierModule(BaseClassifierModule):
@@ -88,12 +89,6 @@ class ClassifierModule(BaseClassifierModule):
     for output in outputs:
       self.log(f"batch/train_{output}", outputs[output])
     return loss
-
-  def validation_step(self, batch, batch_idx):
-      outputs = self.forward(batch)
-
-  def test_step(self, batch, batch_idx):
-      outputs = self.forward(batch)
 
   def on_train_epoch_end(self):
     #self._calc_agg_metrics(stage="epoch/train_")
