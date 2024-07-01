@@ -7,9 +7,9 @@ experiment_name: "killifish_baseline"
 
 common:
   input_type: &input_type "markers"
-  sequence_length: &sequence_length 500
+  sequence_length: &sequence_length 144
   input_size: &input_size 100
-  num_classes: &num_classes 5
+  num_classes: &num_classes 0
   lambda_weak: &lambda_weak 0   # hyperparam on classifying weak (heuristic) labels
   lambda_strong: &lambda_strong 0  # hyperparam on classifying strong (hand) labels
   lambda_pred: &lambda_pred 1  # hyperparam on one-step-ahead prediction
@@ -34,6 +34,7 @@ data_cfg:
   sequence_length: *sequence_length
   num_classes: *num_classes
   normalize_markers: False
+  normalize_markers_adim: True
 #  lambda_weak: *lambda_weak
 #  lambda_strong: *lambda_strong
 #  lambda_pred: *lambda_pred
