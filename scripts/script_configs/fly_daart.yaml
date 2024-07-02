@@ -1,11 +1,23 @@
 Comment: >
   # Debugging instructions:
-  python run.py --config-name="fly_daart" trainer_cfg.fast_dev_run=1
+  python run.py --config-name="fly_daart" trainer_cfg.fast_dev_run=1 data_cfg.num_workers=4
   # match performance of example
   python run.py --config-name="fly_daart" eval_cfg.eval_only=1 eval_cfg.ckpt_path="/data/Projects/segment/daart/results/best_val_model.pt"
 
 project_name: "data_fly"
 experiment_name: "run_fly_repro"
+
+# Common variables:
+common:
+  input_type: &input_type "markers"   # input signal
+  sequence_length: &sequence_length 500 # length of sequence
+  input_size: &input_size 16  # dimensionality of input type
+  num_classes: &num_classes 7 # number of classes
+  lambda_strong: &lambda_strong 1  # hyperparam on classifying strong (hand) labels
+  lambda_weak: &lambda_weak 0.5   # hyperparam on classifying weak (heuristic) labels
+  lambda_pred: &lambda_pred 0.5  # hyperparam on one-step-ahead prediction
+  lambda_recon: &lambda_recon 0 # hyperparam on reconstruction loss
+
 
 data_cfg:
   test_set: "base"
@@ -14,19 +26,19 @@ data_cfg:
     - 2019_06_26_fly2
   ood_expt_ids:
     - 2019_06_26_fly2  # 2019_06_26_fly2 to reproduce example evaluated on all the data
-  input_type: "markers"
-  input_size: 16  # dimensionality of input type
-  sequence_length: 500
-  num_classes: 6
   batch_size: 32
   num_workers: 32
   seed: null
   train_split : 0.9
   val_split: 0
-#  sequence_pad: null # inherited from dataloaderq
-# class_idx: null
-#  encodings: null
-#   samples_per_class: null
+  input_type: *input_type
+  input_size: *input_size  # dimensionality of input type
+  sequence_length: *sequence_length
+  num_classes: *num_classes
+  lambda_weak: *lambda_weak
+  lambda_strong: *lambda_strong
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
 
 trainer_cfg:
   fast_dev_run: 0
@@ -59,20 +71,19 @@ early_stop_cfg:
   patience: 10  # related to val_check_interval
 
 module_cfg:
-  module: "segmenter_module"
-  lambda_strong: 1  # hyperparam on classifying strong (hand) labels
-  lambda_weak: 0.5  # hyperparam on classifying weak (heuristic) labels
-  lambda_pred: 0.5  # hyperparam on one-step-ahead prediction
-  lambda_recon: 0 # hyperparam on seq reconstruction
-  sequence_pad: 16  # padding for sequence length
-  #samples_per_class: null  # inherit from train_dataloader
+  module: "segmenter_module"  # lightning module
+  input_type: *input_type
+  lambda_weak: *lambda_weak
+  lambda_strong: *lambda_strong
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
   optimizer_cfg:
     type: "adam"
     lr: 1e-4
     amsgrad: True
-  classifier: "segmenter"
+  classifier: "encoder_decoder"  # model class
   classifier_cfg:
-    model_class: "multiclass"
+    model_class: "deep"
     backbone : "dtcn"
     n_hid_layers: 2      # hidden layers in network
     n_hid_units: 32      # hidden units per hidden layer
@@ -80,11 +91,8 @@ module_cfg:
     activation: 'lrelu'  # layer nonlinearity
     bidirectional: "true"
     dropout: 0.1
-    classifier_type: "multiclass"
+    classifier_type: "multiclass" # [multiclass, multilabel]
     variational: false
-
-    #input_size: null       # inherit dimensionality of markers
-    #num_classes: null  # inherit from train_dataloader
 
 seed: 0
 

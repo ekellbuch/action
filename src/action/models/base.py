@@ -135,7 +135,7 @@ class BaseModel(nn.Module):
         self.load_state_dict(torch.load(filepath, map_location=lambda storage, loc: storage))
 
 
-class Segmenter(BaseModel):
+class EncoderDecoderModel(BaseModel):
   """General wrapper class for behavioral segmentation models."""
 
   def __init__(self, hparams):
@@ -394,5 +394,5 @@ class Segmenter(BaseModel):
 
 all_classifiers = {
   'baseline': CustomModel,
-  "segmenter": Segmenter,
+  'encoder_decoder': EncoderDecoderModel,
 }

@@ -35,15 +35,11 @@ data_cfg:
   num_classes: *num_classes
   normalize_markers: False
   normalize_markers_adim: True
-#  lambda_weak: *lambda_weak
-#  lambda_strong: *lambda_strong
-#  lambda_pred: *lambda_pred
-#  lambda_recon: *lambda_recon
+  lambda_weak: *lambda_weak
+  lambda_strong: *lambda_strong
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
 
-#  sequence_pad: null # inherited from dataloaderq
-# class_idx: null
-#  encodings: null
-#   samples_per_class: null
 
 trainer_cfg:
   fast_dev_run: 0
@@ -70,7 +66,7 @@ callbacks:
   lr_monitor: 0
 
 early_stop_cfg:
-  monitor: "epoch/val_mse_pred"# "epoch/val_accuracy"
+  monitor: "epoch/val_mse_pred" # "epoch/val_accuracy"
   mode: min  # max
   verbose: true
   min_delta: 0.0
@@ -89,9 +85,9 @@ module_cfg:
     lr: !!float 1e-5
     weight_decay: 0.1
     betas: [0.9, 0.95]
-  classifier: "segmenter"  # model_class
+  classifier: "encoder_decoder"  # model class
   classifier_cfg:
-    model_class: null
+    model_class: "deep"
     backbone : "animalst"
     n_embd: 768      # hidden units per hidden layer
     n_hid_layers: 24      # hidden layers in network
@@ -101,18 +97,12 @@ module_cfg:
     embd_pdrop: 0   # embedding dropout
     resid_pdrop: 0  # residual dropout
     attn_pdrop: 0  # attention, mlp dropout
-
     num_animals: 1
     classifier_type: "multiclass"
-
+    variational: false
     num_frames: *sequence_length
-    input_size: *input_size
-    num_classes: *num_classes
 
-    #lambda_strong: *lambda_strong
-    #lambda_weak: *lambda_weak
-    #lambda_pred: *lambda_pred
-    #lambda_recon: *lambda_recon
+
 
 seed: 0
 

@@ -187,18 +187,13 @@ def train(args):
       # debug mode
       return ind_data, model, trainer
 
-  if args.trainer_cfg.fast_dev_run:
-    ckpt_path=None
-  else:
-    ckpt_path="best"
-
   # Test
-  trainer.test(model, dataloaders=ind_data.test_dataloader(), ckpt_path=ckpt_path)
+  trainer.test(model, dataloaders=ind_data.test_dataloader())
 
   # ------------------------------------------------
   # Evaluate in OOD data as well
   # Free data from memory
-  del ind_data
+  # del ind_data
 
   # Load OOD loader
   ood_data_cfg = args.data_cfg
@@ -210,7 +205,7 @@ def train(args):
     ood_data.setup()
     # Test in ood data:
     model.test_stage_name = "epoch/test_ood_"
-    trainer.test(model, dataloaders=ood_data.test_dataloader(),ckpt_path=ckpt_path)
+    trainer.test(model, dataloaders=ood_data.test_dataloader())
 
 
   if args.trainer_cfg.logger == "wandb":
