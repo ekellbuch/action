@@ -39,11 +39,11 @@ class ZScore(Transform):
     def __repr__(self):
         return 'ZScore()'
 
-class NormalizeAlongDimension(Transform):
+class CollapseAlongDimension(Transform):
     def __init__(self, dim=-1):
         """
         Initializes the normalization transform.
-
+        Sums along dimension dim=-1 and applies z-score normalization along dim=0
         Args:
         - dim (int): The dimension along which to normalize. Default is -1 (last dimension).
         """
@@ -55,17 +55,23 @@ class NormalizeAlongDimension(Transform):
 
         Args:
         - x (torch.Tensor): The input tensor.
+            input shape is (time, n_channels)
 
         Returns:
         - torch.Tensor: The normalized tensor.
         """
         # Compute the sum along the specified dimension, keep dimensions for broadcasting
-        sum_along_dim = x.sum(self.dim, keepdims=True)
-        
-        # Normalize by dividing the tensor by the sum along the specified dimension
-        normalized_x = x / sum_along_dim
-        
-        return normalized_x
+        sample = x.sum(self.dim)
+        # apply z-transformer along the time dimension
+        sample -= np.mean(sample, axis=0)
+        std = np.std(sample, axis=0)
+        sample[:, std > 0] = (sample[:, std > 0] / std[std > 0])
+        return sample
+
+    def __repr__(self):
+        return f'CollapseAlongDimension(%d)' % self.dim
+
+
 if __name__ == '__main__':
   # Dummy data
   dummy_data = torch.randn((3, 256, 256))  # Assuming image data

@@ -12,7 +12,7 @@ from torch.utils.data import SubsetRandomSampler
 from typing import List, Optional, Union
 from typeguard import typechecked
 from action.data.data_utils import load_marker_csv, load_feature_csv, load_marker_h5, load_label_csv, load_label_pkl
-from action.data.data_transforms import ZScore, NormalizeAlongDimension
+from action.data.data_transforms import ZScore, CollapseAlongDimension
 __all__ = [
     'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'preproces_dataset',
 ]
@@ -42,13 +42,13 @@ def preproces_dataset(hparams, model_params):
       logging.info(msg)
       raise FileNotFoundError(msg)
     signals_curr.append('markers')
-    if hparams.get("normalize_markers_adim", False):
-      transforms_curr.append(NormalizeAlongDimension())
-    
     if hparams.get("normalize_markers", True):
       transforms_curr.append(ZScore())
+    elif hparams.get("avg_markers_adim", False):
+      transforms_curr.append(CollapseAlongDimension(dim=hparams.get("sum_markers_dim", hparams.get("avg_markers_dim", -1))))
     else:
       transforms_curr.append(None)
+
     paths_curr.append(markers_file)
 
     # hand labels
@@ -76,6 +76,10 @@ def preproces_dataset(hparams, model_params):
     # tasks
     if model_params.get('lambda_task', 0) > 0:
       tasks_labels_file = os.path.join(hparams['data_dir'], 'tasks', expt_id + '.csv')
+      if not os.path.exists(tasks_labels_file):
+        tasks_labels_file = os.path.join(hparams['data_dir'], 'tasks', expt_id + '.npy')
+      if not os.path.exists(tasks_labels_file):
+        logging.warning('did not find tasks labels file for %s' % expt_id)
       signals_curr.append('tasks')
       transforms_curr.append(ZScore())
       paths_curr.append(tasks_labels_file)
@@ -383,6 +387,9 @@ class SingleDataset(data.Dataset):
                     vals, feature_names = load_feature_csv(self.paths[signal])
                     data_curr = vals
 
+                elif file_ext == 'npy':
+                    # assume single array
+                    data_curr = np.load(self.paths[signal])
                 else:
                     raise ValueError('"%s" is an invalid file extension' % file_ext)
 
@@ -426,11 +433,12 @@ class SingleDataset(data.Dataset):
             # apply transforms to ALL data
             # TODO: fix normalization: should be applied to train/val/test separately.
             # leaving as is to reproduce paper results
-            if self.transforms[signal]:
-                data_curr = self.transforms[signal](data_curr)
 
             # transform into tensor
             data_curr = data_curr.astype(np.float32)
+
+            if self.transforms[signal]:
+                data_curr = self.transforms[signal](data_curr)
 
             # compute batches of temporally contiguous data points
             data_curr, idx_curr = compute_sequences(data_curr, sequence_length, self.sequence_pad)

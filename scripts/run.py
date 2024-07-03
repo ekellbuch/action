@@ -143,9 +143,6 @@ def train(args):
   ind_data = all_datasets[args.data_cfg.test_set](args.data_cfg, **extra_kwargs)
   ind_data.setup()
 
-  train_dataloader = ind_data.train_dataloader()
-  batch = next(iter(train_dataloader))
-  batch['markers'].shape
   # ------------------------------------------------
   # Load module
   module_args = args.module_cfg

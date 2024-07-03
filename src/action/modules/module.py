@@ -25,7 +25,7 @@ class BaseClassifierModule(pl.LightningModule):
   def validation_step(self, batch, batch_idx):
       outputs = self.forward(batch)
 
-  def test_step(self, batch):
+  def test_step(self, batch,batch_idx):
       outputs = self.forward(batch)
 
 
