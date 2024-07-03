@@ -7,8 +7,8 @@ experiment_name: "killifish_baseline"
 
 common:
   input_type: &input_type "markers"
-  sequence_length: &sequence_length 144
-  input_size: &input_size 100
+  sequence_length: &sequence_length 144 # sequence length of each batch
+  input_size: &input_size 100   # input dimension of data
   num_classes: &num_classes 0
   lambda_weak: &lambda_weak 0   # hyperparam on classifying weak (heuristic) labels
   lambda_strong: &lambda_strong 0  # hyperparam on classifying strong (hand) labels
