@@ -19,7 +19,6 @@ class SegmenterModule(BaseClassifierModule):
     weight = hparams.get('class_weights', None)
     if weight is not None:
       weight = torch.tensor(weight, dtype=torch.float32)
-
     
     self.lambda_weak = torch.tensor(hparams.get('lambda_weak', 0))
     self.lambda_strong = torch.tensor(hparams.get('lambda_strong', 0))
@@ -98,6 +97,7 @@ class SegmenterModule(BaseClassifierModule):
       self.log(f"{stage}mse_recon", self.mse_recon.compute())
     if self.lambda_task > 0:
       self.log(f"{stage}mse_task", self.mse_task.compute())
+      self.log(f"{stage}r2_task", self.r2score.compute())
 
   def _reset_agg_metrics(self):
     if self.lambda_strong > 0:
@@ -310,7 +310,7 @@ class SegmenterModule(BaseClassifierModule):
       if lambda_task > 0:
           loss_task = self.task_loss(tasks, outputs_dict['task_prediction'])
           loss += lambda_task * loss_task
-          loss_dict['task_r2'] = self.r2score(outputs_dict['task_prediction'].view(-1), tasks.view(-1))
+          loss_dict['r2_task'] = self.r2score(outputs_dict['task_prediction'].view(-1), tasks.view(-1))
           # log
           loss_dict['loss_task'] = loss_task
           loss_dict['mse_task'] = self.mse_task(tasks, outputs_dict['task_prediction'])
