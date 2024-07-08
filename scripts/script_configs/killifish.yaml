@@ -33,8 +33,7 @@ data_cfg:
   input_size: *input_size  # dimensionality of input type
   sequence_length: *sequence_length
   num_classes: *num_classes
-  normalize_markers: False
-  normalize_markers_adim: True
+  normalize_markers: 'sum_norm_adim'
   lambda_weak: *lambda_weak
   lambda_strong: *lambda_strong
   lambda_pred: *lambda_pred

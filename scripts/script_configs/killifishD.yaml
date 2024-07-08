@@ -36,9 +36,8 @@ data_cfg:
   input_size: *input_size  # dimensionality of input type
   sequence_length: *sequence_length
   num_classes: *num_classes
-  normalize_markers: False  # zscore normalize markers
-  avg_markers_adim: True    # average then zscore
-  avg_markers_dim: -2  #dimension along which to normalize markers, corresponds to normalize_markers_adim.
+  normalize_markers: "avg_sum_norm_adim"  # zscore normalize markers
+  normalize_markers_sum_dim: -2  #dimension along which to normalize markers, corresponds to normalize_markers_adim.
   lambda_weak: *lambda_weak
   lambda_strong: *lambda_strong
   lambda_pred: *lambda_pred
