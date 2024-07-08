@@ -1,0 +1,102 @@
+Comment: >
+  train a random forest baseline on the killifish dataset
+  from behavior to age
+  # Debugging instructions:
+  python run.py --config-name="killifishD" trainer_cfg.fast_dev_run=1 data_cfg.num_workers=4
+
+project_name: "killifish_predict_age"
+experiment_name: "killifish_random_forest"
+
+# Define common variables
+common:
+  input_type: &input_type "markers"
+  sequence_length: &sequence_length 5  # sequence length of each batch
+  input_size: &input_size 100  # input dimension of data
+  num_classes: &num_classes 0
+  lambda_weak: &lambda_weak 0   # hyperparam on classifying weak (heuristic) labels
+  lambda_strong: &lambda_strong 0 # hyperparam on classifying strong (hand) labels
+  lambda_pred: &lambda_pred 0  # hyperparam on one-step-ahead prediction
+  lambda_recon: &lambda_recon 0 # hyperparam on reconstruction loss
+  lambda_task: &lambda_task 1 # hyperparam on task prediction loss
+
+
+data_cfg:
+  test_set: "base" # "concat_all" or "base" for many or 1 data loaders
+  data_dir: ${oc.env:LOCAL_PROJECTS_DIR}/segment/action/data/killifishD
+  expt_ids:
+    - fish0_137_cohort1
+  ood_expt_ids:
+    - fish0_137_cohort1
+  batch_size: 10
+  num_workers: 32
+  seed: null
+  train_split : 0.8
+  val_split: 0
+  input_type: *input_type
+  input_size: *input_size  # dimensionality of input type
+  sequence_length: *sequence_length
+  num_classes: *num_classes
+  normalize_markers: False  # zscore normalize markers
+  avg_markers_adim: True    # average then zscore
+  avg_markers_dim: -2  #dimension along which to normalize markers, corresponds to normalize_markers_adim.
+  lambda_weak: *lambda_weak
+  lambda_strong: *lambda_strong
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
+
+trainer_cfg:
+  fast_dev_run: 0
+  logger: #"wandb"
+  deterministic: false
+  log_every_n_steps: 1
+  max_epochs: 1
+  precision: 32
+  accelerator: "auto"
+  val_check_interval: 1.0  # set to 1 for early stopping
+  gradient_clip_val: 0.1
+  gradient_clip_algorithm: "norm" #"norm"
+
+
+eval_cfg:
+  eval_only: 0   # run evaluation only pipeline
+  ckpt_path: null  # path to checkpoint
+  return_model: 0  # debugger to return model
+
+callbacks:
+  gradnorm: 1
+  checkpoint_callback: 0
+  early_stopping: 0
+  lr_monitor: 0
+
+early_stop_cfg:
+  monitor: "epoch/val_mse_pred"# "epoch/val_accuracy"
+  mode: min  # max
+  verbose: true
+  min_delta: 0.0
+  patience: 10  # related to val_check_interval
+
+module_cfg:
+  module: "regression_nobp"  # lightning module
+  input_type: *input_type
+  lambda_strong: *lambda_strong
+  lambda_weak: *lambda_weak
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
+  optimizer_cfg:
+  classifier: "random-forest"
+  classifier_cfg:
+    model_class: "random-forest"
+    num_frames: *sequence_length
+    input_size: *input_size
+    n_estimators: 25
+
+seed: 42
+
+fiftyone_cfg:
+  dataset_name: "killifishD"
+
+hydra:
+  run:
+    dir: ./outputs/${now:%y-%m-%d}/${now:%H-%M-%S}
