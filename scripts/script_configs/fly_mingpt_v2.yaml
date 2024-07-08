@@ -1,7 +1,6 @@
 Comment: >
-  Run:
+  Debug:
   python run.py --config-name="fly_mingpt_v2" trainer_cfg.fast_dev_run=1 data_cfg.num_workers=4
-  python run.py --config-name="fly_mingpt_v2" trainer_cfg.max_epochs=1 data_cfg.num_workers=2
 
 project_name: "fly_mingpt_v2"
 experiment_name: "min_gpt_long"
@@ -15,6 +14,7 @@ common:
   lambda_strong: &lambda_strong 0.5  # hyperparam on classifying strong (hand) labels
   lambda_pred: &lambda_pred 1  # hyperparam on one-step-ahead prediction
   lambda_recon: &lambda_recon 0 # hyperparam on reconstruction loss
+  lambda_task: &lambda_task 0 # hyperparam on task prediction loss
 
 
 data_cfg:
@@ -41,10 +41,11 @@ data_cfg:
   input_size: *input_size  # dimensionality of input type
   sequence_length: *sequence_length
   num_classes: *num_classes
-#  lambda_weak: *lambda_weak
-#  lambda_strong: *lambda_strong
-#  lambda_pred: *lambda_pred
-#  lambda_recon: *lambda_recon
+  lambda_weak: *lambda_weak
+  lambda_strong: *lambda_strong
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
 
 #  sequence_pad: null # inherited from dataloaderq
 # class_idx: null
@@ -89,12 +90,13 @@ module_cfg:
   lambda_weak: *lambda_weak
   lambda_pred: *lambda_pred
   lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
   optimizer_cfg:
     type: "adamw"
     lr: !!float 1e-5
     weight_decay: 0.1
     betas: [0.9, 0.95]
-  classifier: "segmenter"  # model_class
+  classifier: "encoder_decoder"  # model_class
   classifier_cfg:
     model_class: null
     backbone : "animalst"

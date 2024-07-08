@@ -486,6 +486,9 @@ class SingleDataset(data.Dataset):
               else:
                 data_curr = self.transforms[signal](data_curr)
 
+            # min dim is 1
+            if data_curr.ndim == 1:
+                data_curr = data_curr[:, np.newaxis]
             # compute batches of temporally contiguous data points
             data_curr, idx_curr = compute_sequences(data_curr, sequence_length, self.sequence_pad)
 

@@ -38,7 +38,7 @@ data_cfg:
   lambda_strong: *lambda_strong
   lambda_pred: *lambda_pred
   lambda_recon: *lambda_recon
-
+  lambda_task: *lambda_task
 
 trainer_cfg:
   fast_dev_run: 0

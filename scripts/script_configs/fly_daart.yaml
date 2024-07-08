@@ -17,6 +17,7 @@ common:
   lambda_weak: &lambda_weak 0.5   # hyperparam on classifying weak (heuristic) labels
   lambda_pred: &lambda_pred 0.5  # hyperparam on one-step-ahead prediction
   lambda_recon: &lambda_recon 0 # hyperparam on reconstruction loss
+  lambda_task: &lambda_task 0 # hyperparam on task prediction loss
 
 
 data_cfg:
@@ -39,6 +40,7 @@ data_cfg:
   lambda_strong: *lambda_strong
   lambda_pred: *lambda_pred
   lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
 
 trainer_cfg:
   fast_dev_run: 0
@@ -77,6 +79,7 @@ module_cfg:
   lambda_strong: *lambda_strong
   lambda_pred: *lambda_pred
   lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
   optimizer_cfg:
     type: "adam"
     lr: 1e-4

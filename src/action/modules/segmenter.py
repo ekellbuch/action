@@ -310,7 +310,7 @@ class SegmenterModule(BaseClassifierModule):
       if lambda_task > 0:
           loss_task = self.task_loss(tasks, outputs_dict['task_prediction'])
           loss += lambda_task * loss_task
-          loss_dict['task_r2'] = self.r2score(outputs_dict['task_prediction'], tasks)
+          loss_dict['task_r2'] = self.r2score(outputs_dict['task_prediction'].view(-1), tasks.view(-1))
           # log
           loss_dict['loss_task'] = loss_task
           loss_dict['mse_task'] = self.mse_task(tasks, outputs_dict['task_prediction'])
