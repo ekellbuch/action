@@ -402,7 +402,7 @@ class SegmenterModule(BaseClassifierModule):
     return loss
 
   def on_train_epoch_end(self):
-    #self._calc_agg_metrics(stage="epoch/train_")
+    self._calc_agg_metrics(stage="epoch/train_")
     self._reset_agg_metrics()
 
   def on_validation_epoch_start(self):
