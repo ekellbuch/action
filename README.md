@@ -16,13 +16,13 @@ Given some time series data (i.e. DLC outputs), this codebase allows you to:
 
 ```
 data_directory
+├── markers
+│   ├── <sess_id_0>.csv
+│   └── <sess_id_1>.csv
 ├── labels-hand
 │   ├── <sess_id_0>.csv
 │   └── <sess_id_1>.csv
 ├── labels-heuristic
-│   ├── <sess_id_0>.csv
-│   └── <sess_id_1>.csv
-├── markers
 │   ├── <sess_id_0>.csv
 │   └── <sess_id_1>.csv
 └── videos
@@ -36,7 +36,7 @@ data_cfg:  data configuration
 trainer_cfg: trainer configuration
 eval_cfg: evaluation configuration
 module_cfg: module configuration
-  classifier_cfg: architecture configuration
+classifier_cfg: architecture configuration
 ```
 
 - modules:
