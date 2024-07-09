@@ -402,6 +402,7 @@ class SegmenterModule(BaseClassifierModule):
     return loss
 
   def on_train_epoch_end(self):
+    # TODO: check trainer epoch metric loader
     self._calc_agg_metrics(stage="epoch/train_")
     self._reset_agg_metrics()
 
