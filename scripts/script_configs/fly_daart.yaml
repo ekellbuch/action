@@ -30,8 +30,8 @@ data_cfg:
   batch_size: 32
   num_workers: 32
   seed: null
-  train_split : 0.9
-  val_split: 0
+  train_split : 0.8
+  val_split: 0.1
   input_type: *input_type
   input_size: *input_size  # dimensionality of input type
   sequence_length: *sequence_length

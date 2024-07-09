@@ -1,0 +1,199 @@
+Comment: >
+  Predict behavior from age, model is a transformer
+  # Debugging instructions:
+  python run.py --config-name="killifishD_age_multiple" trainer_cfg.fast_dev_run=1 data_cfg.num_workers=4
+  python run.py --config-name="killifishD_age_multiple" trainer_cfg.fast_dev_run=0 data_cfg.num_workers=4 trainer_cfg.max_epochs=1
+
+project_name: "killifish_predict_age"
+experiment_name: "transformer_one_dataset"
+
+# Define common variables
+common:
+  input_type: &input_type "markers"
+  sequence_length: &sequence_length 5  # sequence length of each batch
+  input_size: &input_size 100  # input dimension of data
+  num_classes: &num_classes 0
+  lambda_weak: &lambda_weak 0   # hyperparam on classifying weak (heuristic) labels
+  lambda_strong: &lambda_strong 0 # hyperparam on classifying strong (hand) labels
+  lambda_pred: &lambda_pred 0  # hyperparam on one-step-ahead prediction
+  lambda_recon: &lambda_recon 0 # hyperparam on reconstruction loss
+  lambda_task: &lambda_task 1 # hyperparam on task prediction loss
+
+
+data_cfg:
+  test_set: "concat_all" # "concat_all" or "base" for many or 1 data loaders
+  data_dir: ${oc.env:LOCAL_PROJECTS_DIR}/segment/action/data/killifishD
+  expt_ids:
+    -  fish0_146_cohort1
+    -  fish1_137_cohort1
+    -  fish4_146_cohort1
+    -  fish11_146_cohort1
+    -  fish5_137_cohort1
+    -  fish9_137_cohort1
+    -  fish6_137_cohort1
+    -  fish8_146_cohort1
+    -  fish2_137_cohort1
+    -  fish3_146_cohort1
+    -  fish4_137_cohort1
+    -  fish10_146_cohort1
+    -  fish5_146_cohort1
+    -  fish11_137_cohort1
+    -  fish0_137_cohort1
+    -  fish1_146_cohort1
+    -  fish2_146_cohort1
+    -  fish3_137_cohort1
+    -  fish6_146_cohort1
+    -  fish9_146_cohort1
+    -  fish7_137_cohort1
+    -  fish8_137_cohort1
+    -  fish10_137_cohort10
+    -  fish11_137_cohort12
+    -  fish1_146_cohort12
+    -  fish9_146_cohort12
+    -  fish3_147_cohort2
+    -  fish8_147_cohort2
+    -  fish7_147_cohort2
+    -  fish10_137_cohort2
+    -  fish4_147_cohort2
+    -  fish0_147_cohort2
+    -  fish6_147_cohort2
+    -  fish9_147_cohort2
+    -  fish2_146_cohort2
+    -  fish2_147_cohort2
+    -  fish1_147_cohort2
+    -  fish10_147_cohort2
+    -  fish3_137_cohort3
+    -  fish10_147_cohort3
+    -  fish5_147_cohort3
+    -  fish0_137_cohort3
+    -  fish1_146_cohort3
+    -  fish6_137_cohort3
+    -  fish8_146_cohort3
+    -  fish7_146_cohort3
+    -  fish3_146_cohort3
+    -  fish0_147_cohort3
+    -  fish1_137_cohort3
+    -  fish4_146_cohort3
+    -  fish11_147_cohort3
+    -  fish5_137_cohort3
+    -  fish11_146_cohort4
+    -  fish11_137_cohort4
+    -  fish5_146_cohort4
+    -  fish7_137_cohort4
+    -  fish8_137_cohort4
+    -  fish6_146_cohort4
+    -  fish2_147_cohort4
+    -  fish10_146_cohort5
+    -  fish4_137_cohort5
+    -  fish9_146_cohort5
+    -  fish0_146_cohort5
+    -  fish10_137_cohort5
+    -  fish4_147_cohort5
+    -  fish9_137_cohort5
+    -  fish2_137_cohort5
+    -  fish7_147_cohort6
+    -  fish4_147_cohort7
+    -  fish11_147_cohort7
+    -  fish2_146_cohort7
+    -  fish11_137_cohort7
+  ood_expt_ids:
+    -  fish4_137_cohort9
+    -  fish10_146_cohort9
+    -  fish6_146_cohort9
+    -  fish4_146_cohort9
+    -  fish11_147_cohort9
+    -  fish0_147_cohort9
+    -  fish1_137_cohort9
+    -  fish3_147_cohort9
+    -  fish9_137_cohort9
+  batch_size: 10
+  num_workers: 32
+  seed: null
+  train_split : 0.8
+  val_split: 0.1
+  input_type: *input_type
+  input_size: *input_size  # dimensionality of input type
+  sequence_length: *sequence_length
+  num_classes: *num_classes
+  normalize_markers: "avg_sum_norm_adim"
+  normalize_tasks: "minmax"
+  normalize_markers_sum_dim: -2  #dimension along which to normalize markers, corresponds to normalize_markers_adim.
+  lambda_weak: *lambda_weak
+  lambda_strong: *lambda_strong
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
+
+trainer_cfg:
+  fast_dev_run: 0
+  logger: "wandb"
+  deterministic: false
+  log_every_n_steps: 1
+  max_epochs: 100
+  precision: 32
+  accelerator: "auto"
+  val_check_interval: 1.0  # set to 1 for early stopping
+  gradient_clip_val: 0.1
+  gradient_clip_algorithm: "norm" #"norm"
+
+
+eval_cfg:
+  eval_only: 0   # run evaluation only pipeline
+  ckpt_path: null  # path to checkpoint
+  return_model: 0  # debugger to return model
+
+callbacks:
+  gradnorm: 1
+  checkpoint_callback: 0
+  early_stopping: 0
+  lr_monitor: 0
+
+early_stop_cfg:
+  monitor: "epoch/val_mse_task"
+  mode: min  # max
+  verbose: true
+  min_delta: 0.0
+  patience: 10  # related to val_check_interval
+
+module_cfg:
+  module: "segmenter_module"  # lightning module
+  input_type: *input_type
+  lambda_strong: *lambda_strong
+  lambda_weak: *lambda_weak
+  lambda_pred: *lambda_pred
+  lambda_recon: *lambda_recon
+  lambda_task: *lambda_task
+  optimizer_cfg:
+    type: "adamw"
+    lr: !!float 1e-5
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
+  classifier: "encoder_decoder"
+  classifier_cfg:
+    model_class: null
+    backbone : "animalst"
+    n_embd: 768      # hidden units per hidden layer
+    n_hid_layers: 24      # hidden layers in network
+    n_head: 12      # number of attention blocks
+    n_hid_units: 256  # size of encoder output
+
+    embd_pdrop: 0   # embedding dropout
+    resid_pdrop: 0  # residual dropout
+    attn_pdrop: 0  # attention, mlp dropout
+
+    num_animals: 1
+    classifier_type: "multiclass"
+
+    num_frames: *sequence_length
+    input_size: *input_size
+    num_classes: *num_classes
+    task_size: 1  # size of final output
+
+seed: 42
+
+fiftyone_cfg:
+  dataset_name: "killifishD"
+
+hydra:
+  run:
+    dir: ./outputs/${now:%y-%m-%d}/${now:%H-%M-%S}
