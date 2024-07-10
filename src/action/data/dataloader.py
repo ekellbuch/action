@@ -246,7 +246,7 @@ def compute_sequence_pad(hparams: dict) -> int:
         elif hparams['backbone'].lower() in ['lstm', 'gru']:
             # give some warmup timesteps
             pad = 4
-        elif hparams['backbone'].lower() in ['animalst']:
+        elif hparams['backbone'].lower() in ['animalst','s5']:
             pad = 0
         elif hparams['backbone'].lower() == 'tgm':
             raise NotImplementedError

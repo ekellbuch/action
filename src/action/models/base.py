@@ -259,6 +259,8 @@ class EncoderDecoderModel(BaseModel):
       from action.models.rnn import RNN as Module
     elif self.hparams['backbone'].lower() in ['animalst']:
       from action.models.min_gpt import AnimalSTWoPosEmb as Module
+    elif self.hparams['backbone'].lower() in ['s5']:
+      from action.models.deep_ssm.s5.seq_model import SimpleS5 as Module
     elif self.hparams['backbone'].lower() == 'tgm':
       raise NotImplementedError
       # from action.models.tgm import TGM as Module

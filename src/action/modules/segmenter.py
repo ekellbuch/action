@@ -333,14 +333,49 @@ class SegmenterModule(BaseClassifierModule):
 
   def configure_optimizers(self):
     # TODO: add scheduler?
-    if self.hparams.optimizer_cfg.get("type", "adam"):
+
+    if self.hparams.optimizer_cfg.get("type", "adam") == "adam":
       params = OmegaConf.to_container(self.hparams.optimizer_cfg, resolve=True)
       params.pop('type')
       optimizer = torch.optim.Adam(self.model.get_parameters(), **params,
                        )
-    if self.hparams.optimizer_cfg.type == 'adamw':
+    elif self.hparams.optimizer_cfg.type == 'adamw':
       optimizer = self._configure_adamw_optimizer()
+    elif self.hparams.optimizer_cfg.type == "s5_standard":
+      optimizer = self._configure_s5standard_optimizer()
+    return optimizer
 
+  def _configure_s5standard_optimizer(self):
+    """This option applies weight decay to C, but B is kept with the
+        SSM parameters with no weight decay.
+    """
+    def ssm_fn(param):
+      if any(keyword in param[0] for keyword in ["B", "Lambda_re", "Lambda_im", "norm","bias"]):
+        return 'ssm'
+      elif any(keyword in param[0].rsplit('.',1)[-1] for keyword in ["C","weight"]):
+        return 'regular'
+      else:
+        return 'none'
+
+    # Separate parameter groups based on function
+    params = list(self.model.named_parameters())
+    param_groups = {'none': [],'ssm': [], 'regular': [] }
+    param_groups_names = {'none': [],'ssm': [], 'regular': [] }
+    for param in params:
+      group = ssm_fn(param)
+      param_groups[group].append(param[1])
+      param_groups_names[group].append(param[0])
+
+    import pdb; pdb.set_trace();
+    train_config = self.hparams.optimizer_cfg
+
+    # Define different optimizers for each group
+    # TODO: ssm: adam and none to sgd
+    optimizer = torch.optim.AdamW([
+      {'params': param_groups['regular'], 'lr': train_config.lr, 'weight_decay': train_config.weight_decay},
+      {'params': param_groups['ssm'], 'lr': train_config.ssm_lr, 'weight_decay': 0.0},
+      {'params': param_groups['none'], 'lr': 0.0, 'weight_decay': 0.0}
+    ])
     return optimizer
 
   def _configure_adamw_optimizer(self):
@@ -459,6 +494,20 @@ class SegmenterBsoftSWeakModule(SegmenterBsoftModule):
                                             weight=weight,
                                             ignore_index=self.ignore_index,
                                             reduction='mean')
+
+def map_nested_fn(fn):
+  """
+  Recursively apply `fn to the key-value pairs of a nested dict / pytree.
+  We use this for some of the optax definitions below.
+  """
+
+  def map_fn(nested_dict):
+    return {
+      k: (map_fn(v) if hasattr(v, "keys") else fn(k, v))
+      for k, v in nested_dict.items()
+    }
+
+  return map_fn
 
 all_segmenter_modules = {
   "segmenter_module": SegmenterModule,  # multi-class classifier module
