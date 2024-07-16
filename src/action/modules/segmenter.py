@@ -6,7 +6,6 @@ from action.modules.module import BaseClassifierModule
 from action.models import losses
 from action.models.base import all_classifiers
 from torchmetrics import Accuracy, R2Score, AveragePrecision, Precision, Recall, F1Score, MeanSquaredError
-
 from omegaconf import OmegaConf
 
 class SegmenterModule(BaseClassifierModule):
@@ -349,28 +348,35 @@ class SegmenterModule(BaseClassifierModule):
     """This option applies weight decay to C, but B is kept with the
         SSM parameters with no weight decay.
     """
+    train_config = self.hparams.optimizer_cfg
+
+    if train_config.get('dt_global', False):
+
+      ssm_fn_list = ["B", "Lambda", "norm", "bias"]
+    else:
+      ssm_fn_list = ["B", "Lambda", "norm", "bias","log_step"]
+
+    not_optim = []
+
     def ssm_fn(param):
-      if any(keyword in param[0] for keyword in ["B", "Lambda_re", "Lambda_im", "norm","bias"]):
+      if any(keyword in param[0] for keyword in ssm_fn_list):
         return 'ssm'
-      elif any(keyword in param[0].rsplit('.',1)[-1] for keyword in ["C","weight"]):
-        return 'regular'
-      else:
+      elif any(keyword in param[0] for keyword in not_optim):
         return 'none'
+      else:
+        return 'regular'
 
     # Separate parameter groups based on function
     params = list(self.model.named_parameters())
-    param_groups = {'none': [],'ssm': [], 'regular': [] }
-    param_groups_names = {'none': [],'ssm': [], 'regular': [] }
+    param_groups = {'none': [],'ssm': [], 'regular': []}
+    param_groups_names = {'none': [], 'ssm': [], 'regular': [] }
     for param in params:
       group = ssm_fn(param)
       param_groups[group].append(param[1])
       param_groups_names[group].append(param[0])
 
-    import pdb; pdb.set_trace();
-    train_config = self.hparams.optimizer_cfg
-
     # Define different optimizers for each group
-    # TODO: ssm: adam and none to sgd
+    # TODO: check bias optimization
     optimizer = torch.optim.AdamW([
       {'params': param_groups['regular'], 'lr': train_config.lr, 'weight_decay': train_config.weight_decay},
       {'params': param_groups['ssm'], 'lr': train_config.ssm_lr, 'weight_decay': 0.0},
