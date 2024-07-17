@@ -212,7 +212,7 @@ class S5SSM(torch.nn.Module):
         self.B = torch.nn.Parameter(
             init_VinvB(lecun_normal(), Vinv)((local_P, H), torch.float)
         )
-
+        B_tilde = self.B[..., 0] + 1j * self.B[..., 1]
 
         # Initialize state to output (C) matrix
         if self.C_init in ["trunc_standard_normal"]:
@@ -268,16 +268,16 @@ class S5SSM(torch.nn.Module):
         else:
             raise ValueError(f"Unknown discretization {discretization}")
 
+        step = step_rescale * torch.exp(self.log_step)
 
         if self.bandlimit is not None:
-            step = step_rescale * torch.exp(self.log_step)
             freqs = step / step_rescale * self.Lambda[:, 1].abs() / (2 * math.pi)
             mask = torch.where(freqs < bandlimit * 0.5, 1, 0)  # (64, )
             self.C = torch.nn.Parameter(
                 torch.view_as_real(torch.view_as_complex(self.C) * mask)
             )
 
-        #self.Lambda_bar, self.B_bar = self.discretize(self.Lambda, B_tilde, step)
+        self.Lambda_bar, self.B_bar = self.discretize(self.Lambda, B_tilde, step)
 
     def initial_state(self, batch_size: Optional[int]):
         batch_shape = (batch_size,) if batch_size is not None else ()
@@ -291,22 +291,11 @@ class S5SSM(torch.nn.Module):
     # NOTE: can only be used as RNN OR S5(MIMO) (no mixing)
     def forward(self,
                 signal: TensorType["batch_size", "seq_length", "num_features"],
-                prev_state: TensorType["batch_size", "num_states"],
-                step_rescale: Union[float, torch.Tensor] = 1.0):
-        B_tilde, C_tilde = self.get_BC_tilde()
-
-        if not torch.is_tensor(step_rescale) or step_rescale.ndim == 0:
-            # step_rescale = torch.ones(signal.shape[-2], device=signal.device) * step_scale
-            step = step_rescale * torch.exp(self.log_step)
-        else:
-            # TODO: This is very expensive due to individual steps being multiplied by B_tilde in self.discretize
-            step = step_rescale[:, None] * torch.exp(self.log_step)
-
-        # Discretize
-        Lambda_bars, B_bars = self.discretize(self.Lambda, B_tilde, step)
-
+                prev_state: TensorType["batch_size", "num_states"]):
+        # TODO: check if discretization should be added here.
+        
         return apply_ssm(
-            Lambda_bars, B_bars, C_tilde, self.D, signal, prev_state, conj_sym=self.conj_sym, bidirectional=self.bidirectional
+            self.Lambda_bar, self.B_bar, self.C_tilde, self.D, signal, prev_state, conj_sym=self.conj_sym, bidirectional=self.bidirectional
         )
 
 
@@ -380,15 +369,14 @@ class S5(torch.nn.Module):
 
     def forward(self,
                 signal: TensorType["batch_size","seq_length","num_features"],
-                prev_state: TensorType["batch_size","num_states"],
-                step_rescale: Union[float, torch.Tensor] = 1.0):
-        # NOTE: step_rescale can be float | Tensor[batch] | Tensor[batch, seq]
-        if not torch.is_tensor(step_rescale):
-            # Duplicate across batchdim
-            step_rescale = torch.ones(signal.shape[0]) * step_rescale
+                prev_state: Optional[TensorType["batch_size","num_states"]]=None,
+                ):
+        # TODO: include step_rescale?
+        if prev_state is None:
+            prev_state = self.initial_state(signal.shape[0]).to(signal.device)
 
-        return torch.vmap(lambda s, ps, ss: self.seq(s, prev_state=ps, step_rescale=ss))(
-            signal, prev_state, step_rescale
+        return torch.vmap(lambda s, ps: self.seq(s, prev_state=ps))(
+            signal, prev_state
         )
 
 
