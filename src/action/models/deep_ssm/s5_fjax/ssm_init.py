@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from action.models.deep_ssm.s5.jax_func import  lecun_normal, uniform
+from action.models.deep_ssm.s5_fjax.jax_func import lecun_normal, uniform
 
 # Initialization Functions
 def make_HiPPO(N):
