@@ -457,7 +457,7 @@ class S5Block(torch.nn.Module):
 
     def forward(self,
                 x: TensorType["batch_size", "seq_length","num_features"],
-                states):
+                states: Optional[TensorType["batch_size","num_states"]] = None):
         # Standard transfomer-style block with GEGLU/Pre-LayerNorm
 
         # Prenorm
