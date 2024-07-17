@@ -29,7 +29,7 @@ def discretize_bilinear(Lambda: TensorType["num_states"],
     # TODO: check complex vs real
     # Lambda = torch.view_as_complex(Lambda)
 
-    Identity = torch.ones(Lambda.shape[0], device=Lambda.device)
+    Identity = torch.ones(Lambda.shape[0])
     BL = 1 / (Identity - (Delta / 2.0) * Lambda)
     Lambda_bar = BL * (Identity + (Delta / 2.0) * Lambda)
     B_bar = (BL * Delta)[..., None] * B_tilde
@@ -385,7 +385,7 @@ class S5(torch.nn.Module):
         # NOTE: step_rescale can be float | Tensor[batch] | Tensor[batch, seq]
         if not torch.is_tensor(step_rescale):
             # Duplicate across batchdim
-            step_rescale = torch.ones(signal.shape[0], device=signal.device) * step_rescale
+            step_rescale = torch.ones(signal.shape[0]) * step_rescale
 
         return torch.vmap(lambda s, ps, ss: self.seq(s, prev_state=ps, step_rescale=ss))(
             signal, prev_state, step_rescale
