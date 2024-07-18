@@ -28,7 +28,6 @@ def discretize_bilinear(Lambda: TensorType["num_states"],
     """
     # TODO: check complex vs real
     # Lambda = torch.view_as_complex(Lambda)
-
     Identity = torch.ones(Lambda.shape[0])
     BL = 1 / (Identity - (Delta / 2.0) * Lambda)
     Lambda_bar = BL * (Identity + (Delta / 2.0) * Lambda)
@@ -268,16 +267,14 @@ class S5SSM(torch.nn.Module):
         else:
             raise ValueError(f"Unknown discretization {discretization}")
 
-        step = step_rescale * torch.exp(self.log_step)
 
         if self.bandlimit is not None:
+            step = step_rescale * torch.exp(self.log_step)
             freqs = step / step_rescale * self.Lambda[:, 1].abs() / (2 * math.pi)
             mask = torch.where(freqs < bandlimit * 0.5, 1, 0)  # (64, )
             self.C = torch.nn.Parameter(
                 torch.view_as_real(torch.view_as_complex(self.C) * mask)
             )
-
-        self.Lambda_bar, self.B_bar = self.discretize(self.Lambda, B_tilde, step)
 
     def initial_state(self, batch_size: Optional[int]):
         batch_shape = (batch_size,) if batch_size is not None else ()
@@ -291,11 +288,21 @@ class S5SSM(torch.nn.Module):
     # NOTE: can only be used as RNN OR S5(MIMO) (no mixing)
     def forward(self,
                 signal: TensorType["batch_size", "seq_length", "num_features"],
-                prev_state: TensorType["batch_size", "num_states"]):
-        # TODO: check if discretization should be added here.
-        
+                prev_state: TensorType["batch_size", "num_states"],
+		step_rescale: Union[float, torch.Tensor] = 1.0):
+ 
+        B_tilde, C_tilde = self.get_BC_tilde()
+       
+        if not torch.is_tensor(step_rescale) or step_rescale.ndim == 0:
+            step = step_rescale * torch.exp(self.log_step)
+        else:
+            # TODO: include invididual steps for discretize
+            step = step_rescale[:, None] * torch.exp(self.log_step)
+
+        Lambda_bar, B_bar = self.discretize(self.Lambda, B_tilde, step)
+ 
         return apply_ssm(
-            self.Lambda_bar, self.B_bar, self.C_tilde, self.D, signal, prev_state, conj_sym=self.conj_sym, bidirectional=self.bidirectional
+            Lambda_bar, B_bar, C_tilde, self.D, signal, prev_state, conj_sym=self.conj_sym, bidirectional=self.bidirectional
         )
 
 
