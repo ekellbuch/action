@@ -264,7 +264,7 @@ class S5SSM(torch.nn.Module):
 
     def initial_state(self, batch_size: Optional[int]):
         batch_shape = (batch_size,) if batch_size is not None else ()
-        return torch.zeros((*batch_shape, self.C_tilde.shape[-1]))
+        return torch.zeros((*batch_shape, self.C.shape[-1]))
     def get_lambda(self):
         if self.clip_eigs:
             Lambda = torch.clip(self.Lambda_re, None, -1e-4) + 1j * self.Lambda_im
