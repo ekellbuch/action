@@ -28,7 +28,7 @@ def discretize_bilinear(Lambda: TensorType["num_states"],
     """
     # TODO: check complex vs real
     # Lambda = torch.view_as_complex(Lambda)
-    Identity = torch.ones(Lambda.shape[0])
+    Identity = torch.ones(Lambda.shape[0], device=Lambda.device)
     BL = 1 / (Identity - (Delta / 2.0) * Lambda)
     Lambda_bar = BL * (Identity + (Delta / 2.0) * Lambda)
     B_bar = (BL * Delta)[..., None] * B_tilde
@@ -50,7 +50,7 @@ def discretize_zoh(Lambda, B_tilde, Delta):
         discretized Lambda_bar (complex64), B_bar (complex64)  (P,), (P,H)
     """
     # Identity = torch.ones(Lambda.shape[0], device=Lambda.device) # (replaced by -1)
-    Lambda_bar = torch.exp(Lambda * Delta)
+    Lambda_bar = torch.exp(Lambda * Delta, device=Lambda.device)
     B_bar = (1 / Lambda * (Lambda_bar - 1))[..., None] * B_tilde
     return Lambda_bar, B_bar
 
@@ -235,19 +235,11 @@ class S5SSM(torch.nn.Module):
 
         else:
             if self.bidirectional:
-                self.C1 = torch.nn.Parameter(init_CV(C_init, (H, local_P), V))
-                self.C2 = torch.nn.Parameter(init_CV(C_init, (H, local_P), V))
-
-                C1 = self.C1[..., 0] + 1j * self.C1[..., 1]
-                C2 = self.C2[..., 0] + 1j * self.C2[..., 1]
-
-                self.C_tilde = torch.cat((C1, C2), axis=-1)
-
+                # TODO: ignore birectional case for now
+                raise NotImplementedError("Did not include bidirectional")
             else:
                 C = init_CV(C_init, (H, local_P), V)
                 self.C = torch.nn.Parameter(C)
-
-                self.C_tilde = self.C[..., 0] + 1j * self.C[..., 1]
 
 
         # Initialize feedthrough (D) matrix
