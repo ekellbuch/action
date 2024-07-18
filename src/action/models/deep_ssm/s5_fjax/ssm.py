@@ -227,11 +227,9 @@ class S5SSM(torch.nn.Module):
         if self.C_init in ["complex_normal"]:
             if self.bidirectional:
                 C = torch.cat((C_init, C_init), axis=-1,)
-                C = torch.nn.Parameter(C)
-                self.C_tilde = C[..., 0] + 1j * C[..., 1]
+                self.C = torch.nn.Parameter(C)
             else:
-                C = torch.nn.Parameter(C_init)
-                self.C_tilde = C[..., 0] + 1j * C[..., 1]
+                self.C = torch.nn.Parameter(C_init)
 
         else:
             if self.bidirectional:
@@ -275,7 +273,7 @@ class S5SSM(torch.nn.Module):
         return Lambda
     def get_BC_tilde(self):
         B_tilde = self.B[..., 0] + 1j * self.B[...,1]
-        C_tilde = self.C_tilde
+        C_tilde = self.C[..., 0] + 1j * self.C[...,1]
         return B_tilde, C_tilde
 
     # NOTE: can only be used as RNN OR S5(MIMO) (no mixing)
