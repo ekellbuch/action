@@ -108,8 +108,6 @@ def apply_ssm(
     if Lambda_bars.ndim == 1:  # Repeat for associative_scan
         Lambda_bars = Lambda_bars.tile(input_sequence.shape[0], 1)
 
-    Lambda_bars[0] = Lambda_bars[0] * prev_state
-
     _, xs = associative_scan(binary_operator, (Lambda_bars, Bu_elements))
 
     if bidirectional:
@@ -118,6 +116,7 @@ def apply_ssm(
         )
         xs = torch.cat((xs, xs2), axis=-1)
 
+    # TODO: use prev_state
     Du = torch.vmap(lambda u: D * u)(input_sequence)
     # TODO: the last element of xs (non-bidir) is the hidden state, allow returning it
     if conj_sym:
@@ -201,10 +200,8 @@ class S5SSM(torch.nn.Module):
         # Initialize diagonal state to state matrix Lambda (eigenvalues)
         self.Lambda_re = torch.nn.Parameter(Lambda_re_init)
         self.Lambda_im = torch.nn.Parameter(Lambda_im_init)
-        if self.clip_eigs:
-            self.Lambda = torch.clip(self.Lambda_re, None, -1e-4) + 1j * self.Lambda_im
-        else:
-            self.Lambda = self.Lambda_re + 1j * self.Lambda_im
+
+        Lambda = self.get_lambda()
 
         # Initialize input to state (B) matrix
         # TODO: remove torch.float
@@ -267,10 +264,9 @@ class S5SSM(torch.nn.Module):
         else:
             raise ValueError(f"Unknown discretization {discretization}")
 
-
         if self.bandlimit is not None:
             step = step_rescale * torch.exp(self.log_step)
-            freqs = step / step_rescale * self.Lambda[:, 1].abs() / (2 * math.pi)
+            freqs = step / step_rescale * Lambda[:, 1].abs() / (2 * math.pi)
             mask = torch.where(freqs < bandlimit * 0.5, 1, 0)  # (64, )
             self.C = torch.nn.Parameter(
                 torch.view_as_real(torch.view_as_complex(self.C) * mask)
@@ -279,7 +275,12 @@ class S5SSM(torch.nn.Module):
     def initial_state(self, batch_size: Optional[int]):
         batch_shape = (batch_size,) if batch_size is not None else ()
         return torch.zeros((*batch_shape, self.C_tilde.shape[-1]))
-
+    def get_lambda(self):
+        if self.clip_eigs:
+            Lambda = torch.clip(self.Lambda_re, None, -1e-4) + 1j * self.Lambda_im
+        else:
+            Lambda = self.Lambda_re + 1j * self.Lambda_im
+        return Lambda
     def get_BC_tilde(self):
         B_tilde = self.B[..., 0] + 1j * self.B[...,1]
         C_tilde = self.C_tilde
@@ -289,18 +290,19 @@ class S5SSM(torch.nn.Module):
     def forward(self,
                 signal: TensorType["batch_size", "seq_length", "num_features"],
                 prev_state: TensorType["batch_size", "num_states"],
-		step_rescale: Union[float, torch.Tensor] = 1.0):
+		            step_rescale: Union[float, torch.Tensor] = 1.0):
  
         B_tilde, C_tilde = self.get_BC_tilde()
+        Lambda = self.get_lambda()
        
         if not torch.is_tensor(step_rescale) or step_rescale.ndim == 0:
-            step = step_rescale * torch.exp(self.log_step)
+            step_scale = step_rescale * torch.exp(self.log_step)
         else:
             # TODO: include invididual steps for discretize
-            step = step_rescale[:, None] * torch.exp(self.log_step)
+            step_scale = step_rescale[:, None] * torch.exp(self.log_step)
 
-        Lambda_bar, B_bar = self.discretize(self.Lambda, B_tilde, step)
- 
+        Lambda_bar, B_bar = self.discretize(Lambda, B_tilde, step_scale)
+
         return apply_ssm(
             Lambda_bar, B_bar, C_tilde, self.D, signal, prev_state, conj_sym=self.conj_sym, bidirectional=self.bidirectional
         )
