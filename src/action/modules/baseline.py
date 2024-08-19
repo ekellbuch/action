@@ -34,8 +34,14 @@ class RegressionNOBPModule(LightningModule):
         self.model_fitted = False
 
         if self.lambda_task > 0:
-          self.mse_task = MeanSquaredError()
-          self.r2score = R2Score()
+          self.train_mse_task = MeanSquaredError()
+          self.train_r2score = R2Score()
+
+          self.val_mse_task = MeanSquaredError()
+          self.val_r2score = R2Score()
+
+          self.test_mse_task = MeanSquaredError()
+          self.test_r2score = R2Score()
 
 
     def predict_step(self, batch, batch_idx):
@@ -70,35 +76,29 @@ class RegressionNOBPModule(LightningModule):
         y_pred = self.model.predict(all_markers)
 
         y_pred = torch.from_numpy(y_pred).to(batch['tasks'].dtype)
-        self.r2score(y_pred, batch['tasks'].view(-1))
-        self.mse_task(y_pred, batch['tasks'].view(-1))
+        self.train_r2score(y_pred, batch['tasks'].view(-1))
+        self.train_mse_task(y_pred, batch['tasks'].view(-1))
 
-        self.log(f'batch/train_r2score', self.r2score)
-        self.log(f'batch/train_mse', self.mse_task)
+        self.log(f'batch/train_r2score', self.train_r2score, on_step=False, on_epoch=True)
+        self.log(f'batch/train_mse', self.train_mse_task, on_step=False, on_epoch=True)
         return
-
-    def on_train_epoch_end(self) -> None:
-        self.log(f'epoch/train_r2score', self.r2score)
-        self.log(f'epoch/train_mse', self.mse_task)
 
     def validation_step(self, batch, batch_idx):
         num_batches = len(batch['markers'])
         all_markers = np.concatenate(batch['markers'].numpy(), axis=0)
+        # add catch for when lightning starts with a validation step
+        if not self.model_fitted:
+            return
         y_pred = self.model.predict(all_markers)
 
         # calculate and log metrics
         y_pred = torch.from_numpy(y_pred).to(batch['markers'].dtype)
-        self.r2score(y_pred, batch['tasks'].view(-1))
-        self.mse_task(y_pred, batch['tasks'].view(-1))
+        self.val_r2score(y_pred, batch['tasks'].view(-1))
+        self.val_mse_task(y_pred, batch['tasks'].view(-1))
 
-        self.log(f'batch/val_r2score', self.r2score)
-        self.log(f'batch/val_mse', self.mse_task)
+        self.log(f'batch/val_r2score', self.val_r2score, on_step=False, on_epoch=True)
+        self.log(f'batch/val_mse', self.val_mse_task, on_step=False, on_epoch=True)
         return
-
-    def on_validation_epoch_end(self) -> None:
-        self.log(f'epoch/val_r2score', self.r2score)
-        self.log(f'epoch/val_mse', self.mse_task)
-
 
     def test_step(self, batch, batch_idx):
         num_batches = len(batch['markers'])
@@ -108,16 +108,13 @@ class RegressionNOBPModule(LightningModule):
         y_pred = self.model.predict(all_markers)
         # calculate and log metrics
         y_pred = torch.from_numpy(y_pred).to(batch['markers'].dtype)
-        self.r2score(y_pred, batch['tasks'].view(-1))
-        self.mse_task(y_pred, batch['tasks'].view(-1))
+        self.test_r2score(y_pred, batch['tasks'].view(-1))
+        self.test_mse_task(y_pred, batch['tasks'].view(-1))
 
-        self.log(f'batch/test_r2score', self.r2score)
-        self.log(f'batch/test_mse', self.mse_task)
+        self.log(f'batch/test_r2score', self.test_r2score, on_step=False, on_epoch=True)
+        self.log(f'batch/test_mse', self.test_mse_task, on_step=False, on_epoch=True)
         return
 
-    def on_test_epoch_end(self) -> None:
-        self.log(f'epoch/test_r2score', self.r2score)
-        self.log(f'epoch/test_mse', self.mse_task)
 
     def configure_optimizers(self):
         return None  # RandomForest doesn't require an optimizer
