@@ -19,6 +19,8 @@ class RegressionNOBPModule(LightningModule):
         super().__init__()
         self.hparams.update(hparams)
 
+        self.test_stage_name = "epoch/test_"
+
         self.lambda_weak = hparams.get('lambda_weak', 0)
         self.lambda_strong = hparams.get('lambda_strong', 0)
         # next step prediction
@@ -79,9 +81,13 @@ class RegressionNOBPModule(LightningModule):
         self.train_r2score(y_pred, batch['tasks'].view(-1))
         self.train_mse_task(y_pred, batch['tasks'].view(-1))
 
-        self.log(f'batch/train_r2score', self.train_r2score, on_step=False, on_epoch=True)
-        self.log(f'batch/train_mse', self.train_mse_task, on_step=False, on_epoch=True)
+        self.log(f'batch/train_r2score', self.train_r2score)
+        self.log(f'batch/train_mse', self.train_mse_task)
         return
+
+    def on_train_epoch_end(self) -> None:
+        self.log(f'epoch/train_r2score', self.train_r2score)
+        self.log(f'epoch/train_mse', self.train_mse_task)
 
     def validation_step(self, batch, batch_idx):
         num_batches = len(batch['markers'])
@@ -96,9 +102,13 @@ class RegressionNOBPModule(LightningModule):
         self.val_r2score(y_pred, batch['tasks'].view(-1))
         self.val_mse_task(y_pred, batch['tasks'].view(-1))
 
-        self.log(f'batch/val_r2score', self.val_r2score, on_step=False, on_epoch=True)
-        self.log(f'batch/val_mse', self.val_mse_task, on_step=False, on_epoch=True)
+        #self.log(f'batch/val_r2score', self.val_r2score)
+        #self.log(f'batch/val_mse', self.val_mse_task)
         return
+
+    def on_validation_epoch_end(self) -> None:
+        self.log(f'epoch/val_r2score', self.val_r2score)
+        self.log(f'epoch/val_mse', self.val_mse_task)
 
     def test_step(self, batch, batch_idx):
         num_batches = len(batch['markers'])
@@ -111,10 +121,13 @@ class RegressionNOBPModule(LightningModule):
         self.test_r2score(y_pred, batch['tasks'].view(-1))
         self.test_mse_task(y_pred, batch['tasks'].view(-1))
 
-        self.log(f'batch/test_r2score', self.test_r2score, on_step=False, on_epoch=True)
-        self.log(f'batch/test_mse', self.test_mse_task, on_step=False, on_epoch=True)
+        #self.log(f'batch/test_r2score', self.test_r2score)
+        #self.log(f'batch/test_mse', self.test_mse_task)
         return
 
+    def on_test_epoch_end(self) -> None:
+        self.log(f'{self.test_stage_name}r2score', self.test_r2score)
+        self.log(f'{self.test_stage_name}mse', self.test_mse_task)
 
     def configure_optimizers(self):
         return None  # RandomForest doesn't require an optimizer
