@@ -107,6 +107,9 @@ class RegressionNOBPModule(LightningModule):
         return
 
     def on_validation_epoch_end(self) -> None:
+        # add catch for when lightning starts with a validation step
+        if not self.model_fitted:
+            return
         self.log(f'epoch/val_r2score', self.val_r2score)
         self.log(f'epoch/val_mse', self.val_mse_task)
 
